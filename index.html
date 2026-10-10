@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voice AI Chunking Engine</title>
+    <title>Perfect RAG — Cloudflare Multilingual Embeddings & Qdrant Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -18,19 +18,22 @@
             background-color: #0d1117;
             color: #e6edf3;
             line-height: 1.5;
-            padding: 32px 16px;
+            padding: 24px 16px;
         }
         .container {
-            max-width: 900px;
+            max-width: 1060px;
             margin: 0 auto;
         }
         header {
-            margin-bottom: 28px;
+            margin-bottom: 20px;
             border-bottom: 1px solid #30363d;
             padding-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
         h1 {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             color: #58a6ff;
             display: flex;
@@ -39,9 +42,69 @@
         }
         p.subtitle {
             color: #8b949e;
-            font-size: 14px;
-            margin-top: 4px;
+            font-size: 13px;
+            margin-top: 3px;
         }
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .btn-settings {
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-settings:hover {
+            background-color: #30363d;
+        }
+
+        /* Nav Tabs */
+        .nav-tabs {
+            display: flex;
+            gap: 8px;
+            border-bottom: 1px solid #30363d;
+            margin-bottom: 24px;
+        }
+        .nav-tab {
+            padding: 10px 18px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #8b949e;
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .nav-tab:hover {
+            color: #c9d1d9;
+        }
+        .nav-tab.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+        .tab-badge {
+            font-size: 11px;
+            background: #21262d;
+            padding: 2px 6px;
+            border-radius: 10px;
+            color: #8b949e;
+        }
+        .nav-tab.active .tab-badge {
+            background: #1f6feb33;
+            color: #58a6ff;
+        }
+
         .card {
             background-color: #161b22;
             border: 1px solid #30363d;
@@ -51,47 +114,14 @@
         }
         label {
             display: block;
-            font-size: 13px;
+            font-size: 12.5px;
             font-weight: 600;
             color: #c9d1d9;
             margin-bottom: 6px;
             text-transform: uppercase;
             letter-spacing: 0.04em;
         }
-        textarea {
-            width: 100%;
-            height: 200px;
-            background-color: #0d1117;
-            border: 1px solid #30363d;
-            border-radius: 6px;
-            color: #e6edf3;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 13px;
-            padding: 12px;
-            resize: vertical;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        textarea:focus {
-            border-color: #58a6ff;
-        }
-        .file-input-wrapper {
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        input[type="file"] {
-            font-size: 13px;
-            color: #8b949e;
-        }
-        .grid-3 {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 16px;
-            margin-top: 16px;
-        }
-        input[type="number"], select {
+        input[type="text"], input[type="number"], select {
             width: 100%;
             background-color: #0d1117;
             border: 1px solid #30363d;
@@ -101,8 +131,32 @@
             padding: 10px 12px;
             outline: none;
         }
-        input[type="number"]:focus, select:focus {
+        input:focus, select:focus, textarea:focus {
             border-color: #58a6ff;
+        }
+        textarea {
+            width: 100%;
+            height: 180px;
+            background-color: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #e6edf3;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            padding: 12px;
+            resize: vertical;
+            outline: none;
+        }
+        .grid-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
         }
         .btn-chunk {
             width: 100%;
@@ -114,8 +168,7 @@
             font-size: 15px;
             font-weight: 600;
             cursor: pointer;
-            margin-top: 20px;
-            transition: background-color 0.2s;
+            margin-top: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -129,31 +182,44 @@
             color: #8b949e;
             cursor: not-allowed;
         }
-        .status-bar {
-            margin: 16px 0;
-            font-size: 14px;
-            font-weight: 500;
-            color: #58a6ff;
-            display: none;
-        }
-        .chunks-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-        }
-        .btn-export {
-            background-color: #21262d;
-            border: 1px solid #30363d;
-            color: #c9d1d9;
-            padding: 6px 12px;
+        .btn-embed-qdrant {
+            background: linear-gradient(135deg, #f38020, #e65100);
+            color: #ffffff;
+            border: none;
             border-radius: 6px;
-            font-size: 13px;
+            padding: 12px 18px;
+            font-size: 14.5px;
+            font-weight: 600;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: opacity 0.2s;
         }
-        .btn-export:hover {
-            background-color: #30363d;
+        .btn-embed-qdrant:hover {
+            opacity: 0.9;
         }
+        .btn-search {
+            width: 100%;
+            background: #1f6feb;
+            color: #ffffff;
+            border: none;
+            border-radius: 6px;
+            padding: 12px 16px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-search:hover {
+            background: #388bfd;
+        }
+
+        /* Chunk Cards */
         .chunk-card {
             background-color: #161b22;
             border: 1px solid #30363d;
@@ -165,7 +231,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 10px;
             border-bottom: 1px solid #21262d;
             padding-bottom: 8px;
         }
@@ -178,137 +244,429 @@
             padding: 2px 8px;
             border-radius: 4px;
         }
-        .chunk-meta {
-            font-size: 12px;
-            color: #8b949e;
-        }
-        .subheading {
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            margin-top: 10px;
-            margin-bottom: 4px;
-        }
-        .text-searchable {
-            color: #d29922;
-        }
-        .text-spoken {
-            color: #3fb950;
-        }
-        pre.content-box {
+        .content-box {
             background-color: #0d1117;
             border: 1px solid #21262d;
             border-radius: 6px;
-            padding: 10px 12px;
+            padding: 12px;
             font-family: 'JetBrains Mono', monospace;
             font-size: 12.5px;
             color: #c9d1d9;
             white-space: pre-wrap;
             word-break: break-word;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        /* Document Filter Pills */
+        .docs-filter-container {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 12px;
+            margin-bottom: 16px;
+        }
+        .doc-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 8px;
+        }
+        .doc-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 6px 12px;
+            font-size: 13px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+        .doc-chip.selected {
+            background: #1f6feb22;
+            border-color: #58a6ff;
+            color: #58a6ff;
+        }
+        .doc-chip input {
+            cursor: pointer;
+        }
+
+        /* Model Result Card */
+        .model-results-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+        @media (min-width: 900px) {
+            .model-results-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        .model-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .model-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #21262d;
+            padding-bottom: 10px;
+        }
+        .model-title {
+            font-size: 14.5px;
+            font-weight: 700;
+            color: #e6edf3;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .model-meta-pill {
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: #21262d;
+            color: #8b949e;
+        }
+        .latency-badge {
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #3fb950;
+            background: #2386361a;
+            border: 1px solid #23863633;
+            padding: 2px 8px;
+            border-radius: 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .hit-item {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 6px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
+        }
+        .hit-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
             margin-bottom: 6px;
+        }
+        .hit-score {
+            font-weight: 700;
+            color: #f38020;
+        }
+        .hit-text {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: #c9d1d9;
+            max-height: 120px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        .modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            padding: 24px;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🎙️ Voice AI Chunking Engine</h1>
-            <p class="subtitle">Enter your document, chunk size, overlap, and model to generate voice-first discrete chunks.</p>
+            <div>
+                <h1>⚡ Perfect RAG — Cloudflare & Qdrant Studio</h1>
+                <p class="subtitle">Context-Augmented Chunking • 7 Cloudflare Embedding Models • Multi-Document Filtered Search</p>
+            </div>
+            <div class="header-actions">
+                <button class="btn-settings" onclick="openSettingsModal()">⚙️ Cloudflare Settings</button>
+            </div>
         </header>
 
-        <div class="card">
-            <label>1. Document</label>
-            <div class="file-input-wrapper">
-                <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx">
-                <span id="fileNameDisplay" style="font-size: 12px; color: #8b949e;"></span>
-            </div>
-            <textarea id="documentText" placeholder="Paste your document content here..."></textarea>
-
-            <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; margin-top: 16px;">
-                <div>
-                    <label for="unitSelect">Unit & Model Target</label>
-                    <select id="unitSelect" onchange="handleUnitChange()">
-                        <option value="tokens" selected>Tokens (Cloudflare 512)</option>
-                        <option value="characters">Characters</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="chunkSize" id="chunkSizeLabel">Max Ceiling (Tokens)</label>
-                    <input type="number" id="chunkSize" value="512" min="20" max="8192">
-                </div>
-                <div>
-                    <label for="overlapWords" id="overlapLabel">Overlap (Tokens)</label>
-                    <input type="number" id="overlapWords" value="50" min="0" max="1000">
-                </div>
-                <div>
-                    <label for="modelSelect">LLM Normalizer</label>
-                    <select id="modelSelect">
-                        <option value="none" selected>None (Deterministic Fast)</option>
-                        <option value="gemini-3.8-flash">Gemini 3.8 Flash (Active)</option>
-                        <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
-                        <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                    </select>
-                </div>
-            </div>
-
-            <button class="btn-chunk" id="btnChunk" onclick="handleChunk()">
-                ⚡ Chunk Document
+        <!-- Navigation Tabs -->
+        <div class="nav-tabs">
+            <button class="nav-tab active" id="tabBtnChunk" onclick="switchTab('chunk')">
+                📄 1. Chunk & Index Document
             </button>
-            <div class="status-bar" id="statusBar">Processing document...</div>
+            <button class="nav-tab" id="tabBtnSearch" onclick="switchTab('search')">
+                🔍 2. Question & Multi-Model Search <span class="tab-badge" id="searchDocCountBadge">0 Docs</span>
+            </button>
+            <button class="nav-tab" id="tabBtnStorage" onclick="switchTab('storage')">
+                📁 3. Qdrant Vector Storage
+            </button>
         </div>
 
-        <div id="outputSection" style="display: none;">
-            <div class="chunks-header">
-                <h2 style="font-size: 18px; font-weight: 600;" id="chunksCountTitle">Generated Chunks</h2>
-                <button class="btn-export" onclick="exportJSON()">📥 Download JSON</button>
+        <!-- ================= TAB 1: CHUNK & INDEX ================= -->
+        <div id="tabContentChunk">
+            <div class="card">
+                <div style="margin-bottom: 16px;">
+                    <label for="docNameInput">Document Name / Identifier</label>
+                    <input type="text" id="docNameInput" placeholder="e.g. Sriram Garden Property Guide" value="Real Estate Guide - Coimbatore">
+                </div>
+
+                <div class="file-input-wrapper">
+                    <label for="fileInput" style="margin: 0; cursor: pointer; background: #21262d; border: 1px solid #30363d; padding: 6px 12px; border-radius: 6px;">
+                        📂 Upload Document (PDF, DOCX, TXT, MD)
+                    </label>
+                    <input type="file" id="fileInput" accept=".txt,.md,.pdf,.docx" style="display: none;">
+                    <span id="fileNameDisplay" style="color: #8b949e; font-size: 13px;">No file selected</span>
+                </div>
+
+                <label for="documentText">Document Content</label>
+                <textarea id="documentText" placeholder="Paste your raw document here..."></textarea>
+
+                <div class="grid-3">
+                    <div>
+                        <label for="unitSelect">Measurement Unit</label>
+                        <select id="unitSelect" onchange="handleUnitChange()">
+                            <option value="tokens" selected>Tokens (Cloudflare 512 Ceiling)</option>
+                            <option value="characters">Characters</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="chunkSize" id="chunkSizeLabel">Max Hard Ceiling (Tokens)</label>
+                        <input type="number" id="chunkSize" value="512" min="50" max="8192">
+                    </div>
+                    <div>
+                        <label for="modelSelect">LLM Boundary Normalizer</label>
+                        <select id="modelSelect">
+                            <option value="none" selected>None (Deterministic Fast)</option>
+                            <option value="gemini-3.8-flash">Gemini 3.8 Flash (Active)</option>
+                            <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+                            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                        </select>
+                    </div>
+                </div>
+
+                <button class="btn-chunk" id="btnChunk" onclick="handleChunk()">
+                    ⚡ 1. Chunk Document
+                </button>
+                <div id="chunkStatusBar" style="display:none; color:#58a6ff; margin-top:12px; font-size:13.5px; font-weight:500;"></div>
             </div>
-            <div id="chunksFeed"></div>
+
+            <!-- Chunks Preview & Save Section -->
+            <div id="outputSection" style="display: none;">
+                <div class="card" style="border-color: #388bfd66; background: #161b22;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h2 style="font-size: 17px; font-weight: 700;" id="chunksCountTitle">Generated Chunks</h2>
+                            <p style="font-size: 13px; color: #8b949e;">Review chunks below, then embed into Qdrant vector space across all 7 Cloudflare models.</p>
+                        </div>
+                        <button class="btn-embed-qdrant" id="btnEmbedQdrant" onclick="handleEmbedAndSave()">
+                            💾 Embed & Save All to Qdrant Vector Space (All Models)
+                        </button>
+                    </div>
+                    <div id="ingestStatusBox" style="display: none; margin-top: 14px; padding: 12px; border-radius: 6px; background: #0d1117; border: 1px solid #30363d; font-size: 13px;"></div>
+                </div>
+
+                <div id="chunksFeed"></div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 2: QUESTION & SEARCH ================= -->
+        <div id="tabContentSearch" style="display: none;">
+            <div class="card">
+                <h2 style="font-size: 17px; font-weight: 700; margin-bottom: 6px;">🎯 Filter Search by Specific Document(s)</h2>
+                <p style="font-size: 13px; color: #8b949e; margin-bottom: 12px;">
+                    Select which indexed documents to search from. Only vectors belonging to the selected document(s) will be queried via Qdrant HNSW filter.
+                </p>
+
+                <div class="docs-filter-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 12px; font-weight: 600; color: #c9d1d9; text-transform: uppercase;">Available Documents in Qdrant:</span>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="selectAllDocs(true)" style="background: none; border: none; color: #58a6ff; font-size: 12px; cursor: pointer;">Select All</button>
+                            <span style="color: #30363d;">|</span>
+                            <button onclick="selectAllDocs(false)" style="background: none; border: none; color: #8b949e; font-size: 12px; cursor: pointer;">Clear Selection</button>
+                        </div>
+                    </div>
+                    <div class="doc-chip-list" id="docFilterChipList">
+                        <span style="color: #8b949e; font-size: 13px;">No documents indexed in Qdrant yet. Please chunk and index a document first.</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 16px;">
+                    <label for="searchQueryInput">Your Question / Search Query</label>
+                    <input type="text" id="searchQueryInput" placeholder="e.g. What are the facilities and BHK construction prices in Sriram Garden?" value="What are the facilities and BHK construction prices in Sriram Garden?">
+                </div>
+
+                <div class="grid-2" style="margin-top: 14px;">
+                    <div>
+                        <label for="topKInput">Top Chunks per Model</label>
+                        <input type="number" id="topKInput" value="3" min="1" max="10">
+                    </div>
+                    <div>
+                        <label>Target Embedding Models</label>
+                        <div style="padding: 10px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; font-size: 13px; color: #8b949e;">
+                            ⚡ All 7 Cloudflare Models (BGE-M3, Gemma, Qwen3, PLaMo, BGE 1.5)
+                        </div>
+                    </div>
+                </div>
+
+                <button class="btn-search" id="btnSearch" onclick="handleSearch()">
+                    🔎 Search with All Cloudflare Models
+                </button>
+                <div id="searchStatusBar" style="display:none; color:#58a6ff; margin-top:12px; font-size:13.5px; font-weight:500;"></div>
+            </div>
+
+            <!-- Search Results Section -->
+            <div id="searchResultsSection" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2 style="font-size: 18px; font-weight: 700;">Comparative Multi-Model Retrieval Results</h2>
+                    <span id="searchMetricsPill" style="font-size: 12px; color: #8b949e;"></span>
+                </div>
+                <div class="model-results-grid" id="modelResultsGrid"></div>
+            </div>
+        </div>
+
+        <!-- ================= TAB 3: STORAGE STATS ================= -->
+        <div id="tabContentStorage" style="display: none;">
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div>
+                        <h2 style="font-size: 17px; font-weight: 700;">📁 Qdrant Collections & Indexed Documents</h2>
+                        <p style="font-size: 13px; color: #8b949e;">Embedded on local disk at <code>./data/qdrant_storage</code>.</p>
+                    </div>
+                    <button onclick="refreshStorageView()" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;">
+                        🔄 Refresh
+                    </button>
+                </div>
+
+                <h3 style="font-size: 14px; margin-bottom: 8px; color: #c9d1d9;">Indexed Documents:</h3>
+                <div id="storageDocsList" style="margin-bottom: 24px;"></div>
+
+                <h3 style="font-size: 14px; margin-bottom: 8px; color: #c9d1d9;">Qdrant Collections Stats:</h3>
+                <div id="storageCollectionsGrid" class="grid-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <h2 style="font-size: 18px; font-weight: 700; margin-bottom: 12px;">⚙️ Cloudflare Workers AI Credentials</h2>
+            <p style="font-size: 13px; color: #8b949e; margin-bottom: 16px;">
+                Enter your Cloudflare Account ID and API Token. If left blank, the studio seamlessly uses built-in local vector simulation.
+            </p>
+            <div style="margin-bottom: 12px;">
+                <label for="cfAccountId">Cloudflare Account ID</label>
+                <input type="text" id="cfAccountId" placeholder="e.g. 9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d">
+            </div>
+            <div style="margin-bottom: 18px;">
+                <label for="cfApiToken">Cloudflare API Token</label>
+                <input type="password" id="cfApiToken" placeholder="e.g. v1.xxxxxxxxxxxxxxxx">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="closeSettingsModal()" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 8px 14px; border-radius: 6px; cursor: pointer;">Cancel</button>
+                <button onclick="saveSettings()" style="background: #238636; border: none; color: #fff; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">Save Credentials</button>
+            </div>
         </div>
     </div>
 
     <script>
         let currentChunks = [];
+        let availableDocs = [];
+        let selectedDocIds = [];
 
-        // Pre-fill sample document
-        document.getElementById('documentText').value = `# Apex Dental Care - Comprehensive Pricing Schedule 2026
+        // Sample Tamil Real Estate Document
+        document.getElementById('documentText').value = `1.ஸ்ரீராம்கார்டன்
 
-All prices are quoted in Indian Rupees (₹ INR) and include all clinical consultations.
+Guideline Value:nine two five
 
-| Treatment | Base Price | Warranty | Pre-requisite |
-|---|---|---|---|
-| Scaling & Ultrasonic Root Polishing | ₹1,500 | 6 Months Routine Checkup | None |
-| Laser Teeth Whitening (Dual-Arch) | ₹8,500 | 1 Year Color Retention | Dental Cleaning |
-| Single Sitting Rotary Root Canal | ₹4,500 | 5 Years Structural Guarantee | Diagnostic X-Ray |
-| Zirconia Monolithic Crown | ₹6,000 | 15 Years Replacement Warranty | Root Canal / Prep |
-| Nobel Biocare Titanium Implant | ₹28,000 | Lifetime Manufacturer Warranty | CBCT 3D Scan |`;
+Main Content:
+காரமடை ஜங்ஷன்ல இருந்து மேட்டுப்பாளையம் ரோட்ல டீச்சர்ஸ் காலனில நம்ம site இருக்குங்க. மேட்டுப்பாளையம் ரோட்ல இருந்து just Seven Hundred metersல T G Pudur Road மேல site இருக்குங்க. அங்க one Acreல Twentyfive plots இருக்குங்க. அங்க பாத்தீங்கனா full gated community site தாங்க. உங்களுக்கு full facilities ஓட நம்மகிட்ட sites இருக்குங்க. Minimum two centல இருந்து five cent வரைக்கும் நம்மகிட்ட site availableஆ இருக்குங்க. Rate பாத்தீங்கனா eight lakhs twenty five Thousand தாங்க.
 
-        // Handle file selection
+Location:
+காரமடை ஜங்ஷன்ல இருந்து மேட்டுப்பாளையம் ரோட்ல வந்தா டீச்சர்ஸ் காலனில T G Pudur Roadல seven hundred meters வந்தீங்கனா ரோட்லயே site இருக்குங்க. மடோனா ஸ்கூல் Road அல்லது தெக்கம் பட்டி போற ரோட்ல நம்ம site இருக்குங்க.
+
+Facilities:
+இந்த projectல gated community, solar street lights, EB supply, thirty three feet tar road, individual water supply, drainage facility மாதிரி எல்லா Facilities இருக்குங்க.
+
+Approval:DEE TEE CEE PEE and RE RAH approval இருக்குதுங்க 
+
+Nearby locations:
+இந்த projectலிருந்து காரமடை just three minutes distanceல, two point five kilometersல இருக்குங்க.
+மேட்டுப்பாளையம் Bus Stand eight minutes distanceல, five point five kilometersல இருக்குங்க.
+மடோனா Matriculation Higher Secondary School three minutes distanceல, one point five kilometersல இருக்குங்க.
+Savidha Hospital two minutes distanceல, one point five kilometersல இருக்குங்க.
+
+Construction Details:
+One BHK option two cents land area siteல five hundred square feet builtup area இருக்கும். Price thirty four lakhsல ஆரம்பிக்குதுங்க.
+Two BHK option two cents land area siteல eight hundred square feet builtup area இருக்கும். Price thirty eight lakhsல ஆரம்பிக்குதுங்க.
+Three BHK option three cents land area siteல one thousand square feet builtup area இருக்கும். Price forty seven lakhsல ஆரம்பிக்குதுங்க.
+
+---
+
+2.பிரம்மா பார்க்
+
+Guideline Value: two five zero
+
+Main Content:
+அன்னூர் to சிறுமுகை ரோட்ல கைகட்டி ஊர்ல, அன்னூர் ரோடு மேலயே நம்ம site இருக்குங்க. அங்க three Acreல seventy plots போட்டுருக்காங்க. அங்க பாத்தீங்கனா full gated community site தாங்க. உங்களுக்கு full facilities ஓட நம்மகிட்ட sites இருக்குங்க. Minimum two centல இருந்து five point five cent வரைக்கும் நம்மகிட்ட site availableஆ இருக்குங்க. Rate பாத்தீங்கனா three lakhs ninety Thousandல இருந்து four lakhs twenty five Thousand வரை போயிட்டு இருக்குங்க.`;
+
+        // Tab Switching
+        function switchTab(tab) {
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+            document.getElementById('tabContentChunk').style.display = 'none';
+            document.getElementById('tabContentSearch').style.display = 'none';
+            document.getElementById('tabContentStorage').style.display = 'none';
+
+            if (tab === 'chunk') {
+                document.getElementById('tabBtnChunk').classList.add('active');
+                document.getElementById('tabContentChunk').style.display = 'block';
+            } else if (tab === 'search') {
+                document.getElementById('tabBtnSearch').classList.add('active');
+                document.getElementById('tabContentSearch').style.display = 'block';
+                loadDocumentsForSearch();
+            } else if (tab === 'storage') {
+                document.getElementById('tabBtnStorage').classList.add('active');
+                document.getElementById('tabContentStorage').style.display = 'block';
+                refreshStorageView();
+            }
+        }
+
+        // File upload parsing
         document.getElementById('fileInput').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
-
             document.getElementById('fileNameDisplay').innerText = file.name;
+            document.getElementById('docNameInput').value = file.name.replace(/\.[^/.]+$/, "");
+
             const formData = new FormData();
             formData.append('file', file);
-
             try {
-                const res = await fetch('/api/parse_file', {
-                    method: 'POST',
-                    body: formData
-                });
+                const res = await fetch('/api/parse_file', { method: 'POST', body: formData });
                 const data = await res.json();
                 if (data.text) {
                     document.getElementById('documentText').value = data.text;
-                } else if (data.error) {
-                    alert('Error: ' + data.error);
                 }
             } catch (err) {
-                // If text file, fallback to FileReader
                 const reader = new FileReader();
-                reader.onload = function(evt) {
-                    document.getElementById('documentText').value = evt.target.result;
-                };
+                reader.onload = (evt) => document.getElementById('documentText').value = evt.target.result;
                 reader.readAsText(file);
             }
         });
@@ -316,43 +674,31 @@ All prices are quoted in Indian Rupees (₹ INR) and include all clinical consul
         function handleUnitChange() {
             const unit = document.getElementById('unitSelect').value;
             const sizeInput = document.getElementById('chunkSize');
-            const overlapInput = document.getElementById('overlapWords');
             const sizeLabel = document.getElementById('chunkSizeLabel');
-            const overlapLabel = document.getElementById('overlapLabel');
-
-            if (unit === 'characters') {
-                sizeLabel.innerText = 'Max Ceiling (Chars)';
-                overlapLabel.innerText = 'Overlap (Chars)';
-                sizeInput.value = 2000;
-                overlapInput.value = 200;
-                sizeInput.max = 8000;
+            if (unit === 'tokens') {
+                sizeLabel.innerText = 'Max Hard Ceiling (Tokens)';
+                sizeInput.value = '512';
             } else {
-                sizeLabel.innerText = 'Max Ceiling (Tokens)';
-                overlapLabel.innerText = 'Overlap (Tokens)';
-                sizeInput.value = 512;
-                overlapInput.value = 50;
-                sizeInput.max = 4096;
+                sizeLabel.innerText = 'Max Hard Ceiling (Characters)';
+                sizeInput.value = '2000';
             }
         }
 
+        // 1. Chunking
         async function handleChunk() {
             const text = document.getElementById('documentText').value.trim();
-            if (!text) {
-                alert('Please enter or upload a document.');
-                return;
-            }
+            if (!text) { alert('Please provide document text.'); return; }
 
             const unit = document.getElementById('unitSelect').value;
-            const chunkSize = parseInt(document.getElementById('chunkSize').value) || (unit === 'characters' ? 2000 : 512);
-            const overlap = parseInt(document.getElementById('overlapWords').value) || (unit === 'characters' ? 200 : 50);
+            const chunkSize = parseInt(document.getElementById('chunkSize').value, 10);
             const model = document.getElementById('modelSelect').value;
+            const docName = document.getElementById('docNameInput').value.trim() || 'Document';
 
             const btn = document.getElementById('btnChunk');
-            const status = document.getElementById('statusBar');
-
+            const status = document.getElementById('chunkStatusBar');
             btn.disabled = true;
             status.style.display = 'block';
-            status.innerText = 'Processing document chunks with hard ceiling...';
+            status.innerText = 'Chunking document with Context-AG engine...';
 
             try {
                 const res = await fetch('/api/chunk', {
@@ -362,32 +708,28 @@ All prices are quoted in Indian Rupees (₹ INR) and include all clinical consul
                         text: text,
                         unit: unit,
                         chunk_size: chunkSize,
-                        overlap: overlap,
-                        model: model
+                        overlap: 50,
+                        model: model,
+                        doc_name: docName
                     })
                 });
-
                 const data = await res.json();
-                if (data.error) {
-                    alert('Error: ' + data.error);
-                    return;
-                }
+                if (data.error) { alert('Error: ' + data.error); return; }
 
                 currentChunks = data.chunks || [];
-                renderChunks(currentChunks, data.stats, chunkSize, unit);
+                renderChunks(currentChunks, chunkSize, unit);
             } catch (err) {
-                alert('Error connecting to backend: ' + err.message);
+                alert('Connection error: ' + err.message);
             } finally {
                 btn.disabled = false;
                 status.style.display = 'none';
             }
         }
 
-        function renderChunks(chunks, stats, ceiling, unit) {
+        function renderChunks(chunks, ceiling, unit) {
             const outSec = document.getElementById('outputSection');
             const feed = document.getElementById('chunksFeed');
             const title = document.getElementById('chunksCountTitle');
-
             outSec.style.display = 'block';
             title.innerText = `Generated Chunks (${chunks.length} Total • Strict Ceiling: ${ceiling} ${unit})`;
             feed.innerHTML = '';
@@ -395,10 +737,9 @@ All prices are quoted in Indian Rupees (₹ INR) and include all clinical consul
             chunks.forEach(c => {
                 const card = document.createElement('div');
                 card.className = 'chunk-card';
-
                 const charCount = c.char_count || (c.text ? c.text.length : 0);
                 const tokenCount = c.token_count || Math.max(1, Math.round(charCount / 4));
-                const chunkText = c.text || c.searchable_augmented_text || c.raw_text || '';
+                const chunkText = c.text || '';
                 const metadataObj = c.metadata || {};
 
                 card.innerHTML = `
@@ -407,45 +748,318 @@ All prices are quoted in Indian Rupees (₹ INR) and include all clinical consul
                             <span class="chunk-badge">Chunk #${c.chunk_id}</span>
                             <span style="font-weight:600; font-size:13px; margin-left:6px; color:#e6edf3;">${(c.chunk_type || 'TEXT').toUpperCase()}</span>
                         </div>
-                        <div class="chunk-meta">
+                        <div style="font-size:12px; color:#8b949e;">
                             <strong>${charCount}</strong> chars • ~<strong>${tokenCount}</strong> tokens
-                            <button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(chunkText)}')); this.innerText='Copied!'; setTimeout(() => this.innerText='Copy Text', 1500);" style="margin-left: 10px; background: #21262d; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-weight:600;">Copy Text</button>
+                            <button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(chunkText)}')); alert('Copied chunk text!');" style="margin-left: 10px; background: #21262d; border: 1px solid #30363d; color: #58a6ff; border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;">Copy</button>
                         </div>
                     </div>
-                    <div class="subheading" style="color: #3fb950;">⚡ Text Payload (Send to Cloudflare Embedding API):</div>
                     <pre class="content-box">${escapeHtml(chunkText)}</pre>
                     <details style="margin-top: 8px; font-size: 12px; color: #8b949e;">
-                        <summary style="cursor: pointer; color: #d29922; font-weight: 500;">📁 Vector DB Payload Metadata (Store in Qdrant/Vectorize - NOT Embedded)</summary>
-                        <pre style="background: #0d1117; border: 1px solid #21262d; padding: 8px 10px; border-radius: 4px; margin-top: 6px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: #8b949e; white-space: pre-wrap;">${escapeHtml(JSON.stringify(metadataObj, null, 2))}</pre>
+                        <summary style="cursor: pointer; color: #d29922; font-weight: 500;">📁 Qdrant Vector DB Metadata</summary>
+                        <pre style="background: #0d1117; border: 1px solid #21262d; padding: 8px; border-radius: 4px; margin-top: 4px; font-size: 11px; color: #8b949e;">${escapeHtml(JSON.stringify(metadataObj, null, 2))}</pre>
                     </details>
                 `;
                 feed.appendChild(card);
             });
-
-            // Smooth scroll to results
             outSec.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 2. Embed & Save to Qdrant
+        async function handleEmbedAndSave() {
+            if (!currentChunks || currentChunks.length === 0) {
+                alert('No chunks to embed. Please chunk the document first.');
+                return;
+            }
+            const docName = document.getElementById('docNameInput').value.trim() || 'Document';
+            const btn = document.getElementById('btnEmbedQdrant');
+            const box = document.getElementById('ingestStatusBox');
+
+            btn.disabled = true;
+            btn.innerText = '⏳ Embedding & Upserting into Qdrant...';
+            box.style.display = 'block';
+            box.innerHTML = `<span style="color:#58a6ff;">Generating embeddings across all Cloudflare models and persisting to Qdrant vector space...</span>`;
+
+            try {
+                const res = await fetch('/api/embed_and_save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        doc_name: docName,
+                        chunks: currentChunks
+                    })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    box.innerHTML = `<span style="color:#f85149;">❌ Error: ${data.error}</span>`;
+                    return;
+                }
+
+                box.innerHTML = `
+                    <div style="color:#3fb950; font-weight:600; margin-bottom:6px;">
+                        ✅ Successfully Indexed ${data.chunks_count} Chunks into Qdrant Across ${data.models_count} Cloudflare Models!
+                    </div>
+                    <div style="color:#8b949e; font-size:12px;">
+                        Document ID: <code>${data.doc_id}</code> • Name: <strong>${data.doc_name}</strong>
+                    </div>
+                `;
+                loadDocumentsForSearch();
+            } catch (err) {
+                box.innerHTML = `<span style="color:#f85149;">❌ Failed: ${err.message}</span>`;
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '💾 Embed & Save All to Qdrant Vector Space (All Models)';
+            }
+        }
+
+        // 3. Load Documents for Search Filtering
+        async function loadDocumentsForSearch() {
+            try {
+                const res = await fetch('/api/documents');
+                const data = await res.json();
+                availableDocs = data.documents || [];
+                renderDocFilterChips();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderDocFilterChips() {
+            const container = document.getElementById('docFilterChipList');
+            const badge = document.getElementById('searchDocCountBadge');
+            badge.innerText = `${availableDocs.length} Docs`;
+
+            if (availableDocs.length === 0) {
+                container.innerHTML = `<span style="color: #8b949e; font-size: 13px;">No documents indexed in Qdrant yet. Please chunk and index a document in Tab 1.</span>`;
+                return;
+            }
+
+            // Select all by default if none selected
+            if (selectedDocIds.length === 0) {
+                selectedDocIds = availableDocs.map(d => d.doc_id);
+            }
+
+            container.innerHTML = '';
+            availableDocs.forEach(d => {
+                const isChecked = selectedDocIds.includes(d.doc_id);
+                const chip = document.createElement('div');
+                chip.className = `doc-chip ${isChecked ? 'selected' : ''}`;
+                chip.innerHTML = `
+                    <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleDocSelection('${d.doc_id}', this.checked)">
+                    <span><strong>${escapeHtml(d.doc_name)}</strong> (${d.chunk_count} chunks)</span>
+                `;
+                container.appendChild(chip);
+            });
+        }
+
+        function toggleDocSelection(docId, checked) {
+            if (checked) {
+                if (!selectedDocIds.includes(docId)) selectedDocIds.push(docId);
+            } else {
+                selectedDocIds = selectedDocIds.filter(id => id !== docId);
+            }
+            renderDocFilterChips();
+        }
+
+        function selectAllDocs(selectAll) {
+            if (selectAll) {
+                selectedDocIds = availableDocs.map(d => d.doc_id);
+            } else {
+                selectedDocIds = [];
+            }
+            renderDocFilterChips();
+        }
+
+        // 4. Multi-Model Semantic Search
+        async function handleSearch() {
+            const query = document.getElementById('searchQueryInput').value.trim();
+            if (!query) { alert('Please enter a question/query.'); return; }
+
+            if (selectedDocIds.length === 0) {
+                alert('Please select at least one document from the filter above to search from.');
+                return;
+            }
+
+            const topK = parseInt(document.getElementById('topKInput').value, 10) || 3;
+            const btn = document.getElementById('btnSearch');
+            const status = document.getElementById('searchStatusBar');
+            btn.disabled = true;
+            status.style.display = 'block';
+            status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all Cloudflare models in parallel...`;
+
+            try {
+                const res = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query,
+                        selected_doc_ids: selectedDocIds,
+                        top_k: topK
+                    })
+                });
+                const data = await res.json();
+                if (data.error) { alert('Error: ' + data.error); return; }
+
+                renderSearchResults(data);
+            } catch (err) {
+                alert('Search error: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                status.style.display = 'none';
+            }
+        }
+
+        function renderSearchResults(data) {
+            const sec = document.getElementById('searchResultsSection');
+            const grid = document.getElementById('modelResultsGrid');
+            const pill = document.getElementById('searchMetricsPill');
+            sec.style.display = 'block';
+            grid.innerHTML = '';
+
+            const resultsByModel = data.results_by_model || {};
+            const modelKeys = Object.keys(resultsByModel);
+            pill.innerText = `Queried ${modelKeys.length} Models • Filtered to ${data.selected_doc_ids.length} Document(s)`;
+
+            modelKeys.forEach(mid => {
+                const mData = resultsByModel[mid];
+                const card = document.createElement('div');
+                card.className = 'model-card';
+
+                const hits = mData.hits || [];
+                let hitsHtml = '';
+                if (hits.length === 0) {
+                    hitsHtml = `<div style="color:#8b949e; font-size:12.5px; padding:12px; text-align:center;">No matching chunks found for this query in selected document(s).</div>`;
+                } else {
+                    hits.forEach((h, idx) => {
+                        hitsHtml += `
+                            <div class="hit-item">
+                                <div class="hit-header">
+                                    <span>Rank #${idx + 1} • <strong style="color:#58a6ff;">${escapeHtml(h.doc_name)}</strong> (Chunk #${h.chunk_id})</span>
+                                    <span class="hit-score">Cosine: ${(h.score * 100).toFixed(1)}% (${h.score})</span>
+                                </div>
+                                <div class="hit-text">${escapeHtml(h.text)}</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                card.innerHTML = `
+                    <div class="model-card-header">
+                        <div>
+                            <div class="model-title">
+                                <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${mData.badge_color || '#58a6ff'};"></span>
+                                ${escapeHtml(mData.display_name)}
+                            </div>
+                            <div style="font-size:12px; color:#8b949e; margin-top:2px;">
+                                ${mData.dimensions}d • ${escapeHtml(mData.languages)}
+                            </div>
+                        </div>
+                        <div class="latency-badge">
+                            ⚡ ${mData.total_latency_ms} ms <span style="font-size:10px; color:#8b949e;">(API: ${mData.api_latency_ms}ms | Qdrant: ${mData.qdrant_latency_ms}ms)</span>
+                        </div>
+                    </div>
+                    <div>${hitsHtml}</div>
+                `;
+                grid.appendChild(card);
+            });
+
+            sec.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 5. Storage Tab
+        async function refreshStorageView() {
+            try {
+                const res = await fetch('/api/documents');
+                const data = await res.json();
+                const docs = data.documents || [];
+                const stats = data.stats || {};
+
+                // Render Docs
+                const docsList = document.getElementById('storageDocsList');
+                if (docs.length === 0) {
+                    docsList.innerHTML = `<span style="color:#8b949e; font-size:13px;">No documents in Qdrant.</span>`;
+                } else {
+                    docsList.innerHTML = '';
+                    docs.forEach(d => {
+                        const item = document.createElement('div');
+                        item.style = 'display:flex; justify-content:space-between; align-items:center; background:#0d1117; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:8px;';
+                        item.innerHTML = `
+                            <div>
+                                <strong style="color:#e6edf3;">${escapeHtml(d.doc_name)}</strong>
+                                <span style="color:#8b949e; font-size:12px; margin-left:8px;">ID: <code>${d.doc_id}</code> • ${d.chunk_count} Chunks</span>
+                            </div>
+                            <button onclick="deleteDocument('${d.doc_id}')" style="background:#da363322; border:1px solid #da363355; color:#f85149; border-radius:4px; padding:4px 10px; font-size:12px; cursor:pointer;">Delete</button>
+                        `;
+                        docsList.appendChild(item);
+                    });
+                }
+
+                // Render Collections
+                const colGrid = document.getElementById('storageCollectionsGrid');
+                colGrid.innerHTML = '';
+                Object.keys(stats).forEach(mid => {
+                    const s = stats[mid];
+                    const cCard = document.createElement('div');
+                    cCard.style = 'background:#0d1117; border:1px solid #21262d; border-radius:6px; padding:12px;';
+                    cCard.innerHTML = `
+                        <div style="font-weight:600; font-size:13px; color:#e6edf3; display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:${s.badge_color || '#58a6ff'};"></span>
+                            ${escapeHtml(s.display_name)}
+                        </div>
+                        <div style="font-size:12px; color:#8b949e; margin-top:4px;">
+                            Collection: <code>${s.name}</code> • ${s.dimensions} Dimensions
+                        </div>
+                        <div style="font-size:13px; font-weight:700; color:#58a6ff; margin-top:6px;">
+                            ${s.points_count} Vectors Stored
+                        </div>
+                    `;
+                    colGrid.appendChild(cCard);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('Are you sure you want to delete this document from all Qdrant collections?')) return;
+            try {
+                await fetch('/api/delete_document', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ doc_id: docId })
+                });
+                refreshStorageView();
+                loadDocumentsForSearch();
+            } catch (e) { alert(e.message); }
+        }
+
+        // Settings Modal
+        function openSettingsModal() { document.getElementById('settingsModal').style.display = 'flex'; }
+        function closeSettingsModal() { document.getElementById('settingsModal').style.display = 'none'; }
+        async function saveSettings() {
+            const accId = document.getElementById('cfAccountId').value.trim();
+            const token = document.getElementById('cfApiToken').value.trim();
+            if (!accId || !token) { alert('Both fields are required.'); return; }
+            try {
+                const res = await fetch('/api/save_credentials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ account_id: accId, api_token: token })
+                });
+                const d = await res.json();
+                if (d.status === 'success') {
+                    alert('Cloudflare credentials saved successfully!');
+                    closeSettingsModal();
+                } else { alert('Error: ' + d.error); }
+            } catch (e) { alert(e.message); }
         }
 
         function escapeHtml(str) {
             if (!str) return '';
-            return str
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&#039;");
+            return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
         }
 
-        function exportJSON() {
-            if (!currentChunks.length) return;
-            const blob = new Blob([JSON.stringify(currentChunks, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'voice_ai_chunks.json';
-            a.click();
-            URL.revokeObjectURL(url);
-        }
+        // Initial load
+        loadDocumentsForSearch();
     </script>
 </body>
 </html>

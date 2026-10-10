@@ -24,3 +24,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.log
+
+# Local Vector Database & Storage
+data/
+*.sqlite
