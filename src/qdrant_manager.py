@@ -25,8 +25,22 @@ class LocalQdrantManager:
     def __init__(self, storage_path: str = DEFAULT_QDRANT_STORAGE_PATH):
         self.storage_path = storage_path
         os.makedirs(self.storage_path, exist_ok=True)
-        self.client = QdrantClient(path=self.storage_path)
+        try:
+            self.client = QdrantClient(path=self.storage_path)
+        except Exception as e:
+            if "already accessed" in str(e).lower() or "permission denied" in str(e).lower() or "locked" in str(e).lower():
+                print(f"\n[!] Qdrant Lock Error: Storage directory '{self.storage_path}' is currently locked by another active server process.")
+                print("[!] Please make sure no other instance of server.py or python is running.\n")
+            raise e
         self._ensure_all_collections()
+
+    def close(self):
+        """Cleanly releases locks and closes local storage."""
+        try:
+            if hasattr(self, "client") and self.client is not None:
+                self.client.close()
+        except Exception:
+            pass
 
     def _ensure_all_collections(self):
         """Initializes collections for all Cloudflare models."""

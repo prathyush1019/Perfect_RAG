@@ -378,6 +378,10 @@ def run_server(port=8080):
         pass
     finally:
         server.server_close()
+        try:
+            qdrant_manager.close()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
