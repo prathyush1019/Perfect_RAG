@@ -188,6 +188,11 @@ class ChunkingHandler(BaseHTTPRequestHandler):
 
             chunk_texts = [c.get("text") or c.get("clean_text") or c.get("raw_text") or str(c) for c in chunks]
 
+            # If clear_previous is True (default: True to only keep the current document), wipe old vectors
+            clear_previous = payload.get("clear_previous", True)
+            if clear_previous:
+                qdrant_manager.clear_all_documents()
+
             # Generate embeddings for each model in parallel
             embeddings_by_model = {}
             api_latencies = {}
@@ -293,6 +298,10 @@ class ChunkingHandler(BaseHTTPRequestHandler):
 
             success = qdrant_manager.delete_document(doc_id)
             self._send_json({"status": "success", "deleted_doc_id": doc_id, "success": success})
+
+        elif parsed.path == "/api/clear_all":
+            qdrant_manager.clear_all_documents()
+            self._send_json({"status": "success", "message": "All documents removed from Qdrant vector space"})
 
         elif parsed.path == "/api/save_credentials":
             content_len = int(self.headers.get("Content-Length", 0))

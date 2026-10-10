@@ -238,6 +238,24 @@ class LocalQdrantManager:
                 pass
         return deleted
 
+    def clear_all_documents(self) -> bool:
+        """
+        Deletes all stored points and vectors across all Cloudflare collections,
+        completely purging all indexed documents from Qdrant.
+        """
+        for model_id, model_cfg in ALL_CLOUDFLARE_MODELS.items():
+            col_name = model_cfg.collection_name
+            try:
+                if self.client.collection_exists(col_name):
+                    self.client.delete(
+                        collection_name=col_name,
+                        points_selector=qmodels.FilterSelector(filter=qmodels.Filter()),
+                        wait=True
+                    )
+            except Exception as e:
+                print(f"Error clearing points in collection {col_name}: {e}")
+        return True
+
     def get_collection_stats(self) -> Dict[str, Dict[str, Any]]:
         """Returns statistics for each Cloudflare model collection."""
         stats = {}
