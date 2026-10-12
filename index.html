@@ -1224,9 +1224,14 @@ Main Content:
                     });
                 }
 
-                const apiBadge = mData.is_mock 
-                    ? `<span style="font-size:10.5px; background:#d2992222; border:1px solid #d2992255; color:#d29922; padding:2px 6px; border-radius:10px;">Simulated Vectors</span>`
-                    : `<span style="font-size:10.5px; background:#23863622; border:1px solid #23863655; color:#3fb950; padding:2px 6px; border-radius:10px;">🟢 Live Cloudflare API</span>`;
+                let apiBadge = '';
+                if (mData.api_source === 'live_gemini_api' || mData.model_id === 'gemini-embedding-001') {
+                    apiBadge = `<span style="font-size:10.5px; background:#1b472855; border:1px solid #238636; color:#3fb950; padding:2px 8px; border-radius:10px;">🟢 Live Gemini API (High Precision)</span>`;
+                } else if (mData.is_mock) {
+                    apiBadge = `<span style="font-size:10.5px; background:#da363322; border:1px solid #da363355; color:#f85149; padding:2px 8px; border-radius:10px;" title="${escapeHtml(mData.api_error || 'Cloudflare 401 Auth Error')}">⚠️ Cloudflare 401 Auth Error (Random Hashes)</span>`;
+                } else {
+                    apiBadge = `<span style="font-size:10.5px; background:#23863622; border:1px solid #23863655; color:#3fb950; padding:2px 8px; border-radius:10px;">🟢 Live Cloudflare API</span>`;
+                }
 
                 card.innerHTML = `
                     <div class="model-card-header">

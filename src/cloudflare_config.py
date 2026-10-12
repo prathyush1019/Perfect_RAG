@@ -43,8 +43,20 @@ class EmbeddingModelConfig:
     provider: str = "Cloudflare Workers AI"
 
 
-# Full catalog of ALL Cloudflare Workers AI text embedding models
+# Full catalog of embedding models (Google Gemini & Cloudflare Workers AI)
 ALL_CLOUDFLARE_MODELS: Dict[str, EmbeddingModelConfig] = {
+    "gemini-embedding-001": EmbeddingModelConfig(
+        id="gemini-embedding-001",
+        display_name="Google Gemini Embedding (Live Active)",
+        dimensions=3072,
+        languages="100+ Languages (High Precision Multilingual)",
+        max_tokens=2048,
+        collection_name="gemini_embedding_001",
+        description="Google's flagship 3072-dimensional multilingual embedding model. Authenticated directly via your active GEMINI_API_KEY.",
+        badge_color="#34A853",
+        is_multilingual=True,
+        provider="Google Gemini API"
+    ),
     "@cf/baai/bge-m3": EmbeddingModelConfig(
         id="@cf/baai/bge-m3",
         display_name="BGE-M3 (Flagship Multilingual)",

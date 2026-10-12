@@ -102,6 +102,9 @@ class CloudflareEmbedder:
         if not texts:
             return [], 0.0
 
+        if "gemini" in model_id.lower():
+            return self._embed_with_gemini(texts, model_id)
+
         model_cfg = ALL_CLOUDFLARE_MODELS.get(model_id)
         target_dims = model_cfg.dimensions if model_cfg else 1024
 
@@ -254,3 +257,33 @@ class CloudflareEmbedder:
 
         sim_latency_ms = (time.perf_counter() - start_t) * 1000.0 + 12.0
         return embeddings, sim_latency_ms
+
+    def _embed_with_gemini(self, texts: List[str], model_id: str) -> Tuple[List[List[float]], float]:
+        """Generate high-precision embeddings using Google Gemini API."""
+        t0 = time.perf_counter()
+        gemini_api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+        if not gemini_api_key:
+            raise ValueError("GEMINI_API_KEY not configured in .env")
+
+        from google import genai
+        client = genai.Client(api_key=gemini_api_key)
+
+        vectors = []
+        for t in texts:
+            r = client.models.embed_content(model="gemini-embedding-001", contents=t)
+            v = np.array(r.embeddings[0].values, dtype=np.float32)
+            norm = np.linalg.norm(v)
+            if norm > 0:
+                v = v / norm
+            vectors.append(v.tolist())
+
+        lat_ms = (time.perf_counter() - t0) * 1000.0
+        self.last_fetch_meta[model_id] = {
+            "source": "live_gemini_api",
+            "is_mock": False,
+            "status_code": 200,
+            "dimensions": 3072,
+            "vector_sample": [round(x, 4) for x in vectors[0][:5]] if vectors else [],
+            "norm": 1.0
+        }
+        return vectors, lat_ms
