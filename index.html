@@ -393,6 +393,83 @@
             max-width: 500px;
             padding: 24px;
         }
+        /* Model Quick Selector */
+        .model-quick-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .quick-pill {
+            background: #161b22;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            user-select: none;
+        }
+        .quick-pill:hover {
+            border-color: #58a6ff;
+            color: #58a6ff;
+        }
+        .quick-pill.active {
+            background: #1f6feb26;
+            border-color: #58a6ff;
+            color: #58a6ff;
+            font-weight: 600;
+        }
+        .match-bar-bg {
+            background: #21262d;
+            border-radius: 4px;
+            height: 6px;
+            width: 100%;
+            overflow: hidden;
+            margin: 6px 0 10px 0;
+        }
+        .match-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #1f6feb, #3fb950);
+            transition: width 0.3s ease;
+        }
+        .benchmark-summary {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 20px;
+        }
+        .benchmark-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .benchmark-table th {
+            text-align: left;
+            padding: 8px 10px;
+            border-bottom: 1px solid #30363d;
+            color: #8b949e;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .benchmark-table td {
+            padding: 10px;
+            border-bottom: 1px solid #21262d;
+            color: #e6edf3;
+        }
+        .best-badge {
+            background: #23863633;
+            border: 1px solid #23863688;
+            color: #3fb950;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
     </style>
 </head>
 <body>
@@ -403,6 +480,9 @@
                 <p class="subtitle">Context-Augmented Chunking • 7 Cloudflare Embedding Models • Multi-Document Filtered Search</p>
             </div>
             <div class="header-actions">
+                <span id="cfStatusBadge" onclick="openSettingsModal()" style="cursor:pointer; font-size:12px; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; font-weight:500; background:#21262d; border:1px solid #30363d; color:#8b949e;">
+                    ⏳ Checking API...
+                </span>
                 <button class="btn-settings" onclick="openSettingsModal()">⚙️ Cloudflare Settings</button>
             </div>
         </header>
@@ -522,19 +602,41 @@
 
                 <div class="grid-2" style="margin-top: 14px;">
                     <div>
-                        <label for="topKInput">Top Chunks per Model</label>
-                        <input type="number" id="topKInput" value="3" min="1" max="10">
+                        <label for="searchModelSelect">Target Embedding Model</label>
+                        <select id="searchModelSelect" onchange="handleModelSelectChange()" style="width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 10px 12px; border-radius: 6px; font-size: 13.5px; font-family: inherit;">
+                            <option value="@cf/baai/bge-m3" selected>🟠 BGE-M3 (Flagship Multilingual, 1024d) — Recommended</option>
+                            <option value="@cf/google/embeddinggemma-300m">🔵 EmbeddingGemma-300M (Google Gemma, 768d)</option>
+                            <option value="@cf/qwen/qwen3-embedding-0.6b">🟣 Qwen3-Embedding-0.6B (Alibaba Qwen, 1024d)</option>
+                            <option value="@cf/pfnet/plamo-embedding-1b">🟢 PLaMo-Embedding-1B (PFN Multilingual, 1024d)</option>
+                            <option value="@cf/baai/bge-large-en-v1.5">🟡 BGE-Large-EN-v1.5 (BAAI High-Capacity, 1024d)</option>
+                            <option value="@cf/baai/bge-base-en-v1.5">⚪ BGE-Base-EN-v1.5 (BAAI Balanced, 768d)</option>
+                            <option value="@cf/baai/bge-small-en-v1.5">🟤 BGE-Small-EN-v1.5 (BAAI Ultra-Fast, 384d)</option>
+                            <option value="all">⚡ All 7 Models (Benchmark & Compare Everything)</option>
+                        </select>
                     </div>
                     <div>
-                        <label>Target Embedding Models</label>
-                        <div style="padding: 10px 12px; background: #0d1117; border: 1px solid #30363d; border-radius: 6px; font-size: 13px; color: #8b949e;">
-                            ⚡ All 7 Cloudflare Models (BGE-M3, Gemma, Qwen3, PLaMo, BGE 1.5)
-                        </div>
+                        <label for="topKInput">Top Chunks to Retrieve</label>
+                        <input type="number" id="topKInput" value="3" min="1" max="10">
                     </div>
                 </div>
 
-                <button class="btn-search" id="btnSearch" onclick="handleSearch()">
-                    🔎 Search with All Cloudflare Models
+                <!-- Quick Model Select Pills -->
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 11.5px; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Quick Model Selection:</div>
+                    <div class="model-quick-pills" id="modelQuickPills">
+                        <button type="button" class="quick-pill active" onclick="selectSearchModel('@cf/baai/bge-m3')">🟠 BGE-M3</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/google/embeddinggemma-300m')">🔵 Gemma-300M</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/qwen/qwen3-embedding-0.6b')">🟣 Qwen3</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/pfnet/plamo-embedding-1b')">🟢 PLaMo</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-large-en-v1.5')">🟡 BGE-Large</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-base-en-v1.5')">⚪ BGE-Base</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-small-en-v1.5')">🟤 BGE-Small</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('all')">⚡ All 7 Models</button>
+                    </div>
+                </div>
+
+                <button class="btn-search" id="btnSearch" onclick="handleSearch()" style="margin-top: 16px;">
+                    🔍 Embed Question & Fetch Chunks using BGE-M3 (Single Model)
                 </button>
                 <div id="searchStatusBar" style="display:none; color:#58a6ff; margin-top:12px; font-size:13.5px; font-weight:500;"></div>
             </div>
@@ -882,6 +984,35 @@ Main Content:
             renderDocFilterChips();
         }
 
+        function handleModelSelectChange() {
+            const sel = document.getElementById('searchModelSelect');
+            const val = sel.value;
+            const btn = document.getElementById('btnSearch');
+
+            // Update pills active state
+            document.querySelectorAll('.quick-pill').forEach(pill => {
+                const onclickAttr = pill.getAttribute('onclick') || '';
+                if (onclickAttr.includes(`'${val}'`)) {
+                    pill.classList.add('active');
+                } else {
+                    pill.classList.remove('active');
+                }
+            });
+
+            if (val === 'all') {
+                btn.innerText = '⚡ Embed Question & Fetch Chunks Across All 7 Models (Benchmark)';
+            } else {
+                const optText = sel.options[sel.selectedIndex].text.split('(')[0].trim();
+                btn.innerText = `🔍 Embed Question & Fetch Chunks using ${optText} Only`;
+            }
+        }
+
+        function selectSearchModel(modelId) {
+            const sel = document.getElementById('searchModelSelect');
+            sel.value = modelId;
+            handleModelSelectChange();
+        }
+
         // 4. Multi-Model Semantic Search
         async function handleSearch() {
             const query = document.getElementById('searchQueryInput').value.trim();
@@ -892,12 +1023,22 @@ Main Content:
                 return;
             }
 
+            const modelId = document.getElementById('searchModelSelect').value;
+            const isAll = modelId === 'all';
             const topK = parseInt(document.getElementById('topKInput').value, 10) || 3;
             const btn = document.getElementById('btnSearch');
             const status = document.getElementById('searchStatusBar');
+
             btn.disabled = true;
             status.style.display = 'block';
-            status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all Cloudflare models in parallel...`;
+
+            if (isAll) {
+                status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all 7 Cloudflare models in parallel...`;
+            } else {
+                const sel = document.getElementById('searchModelSelect');
+                const modelName = sel.options[sel.selectedIndex].text.split('(')[0].trim();
+                status.innerText = `Sending question to Cloudflare API (${modelName}) & retrieving chunks from Qdrant...`;
+            }
 
             try {
                 const res = await fetch('/api/search', {
@@ -906,6 +1047,7 @@ Main Content:
                     body: JSON.stringify({
                         query: query,
                         selected_doc_ids: selectedDocIds,
+                        model_id: modelId,
                         top_k: topK
                     })
                 });
@@ -930,30 +1072,122 @@ Main Content:
 
             const resultsByModel = data.results_by_model || {};
             const modelKeys = Object.keys(resultsByModel);
-            pill.innerText = `Queried ${modelKeys.length} Models • Filtered to ${data.selected_doc_ids.length} Document(s)`;
+            const isSingle = data.is_single_model || modelKeys.length === 1;
 
+            if (isSingle) {
+                const mData = resultsByModel[modelKeys[0]];
+                pill.innerText = `Queried Single Model: ${mData ? mData.display_name : ''} • Filtered to ${data.selected_doc_ids.length} Document(s)`;
+            } else {
+                pill.innerText = `Queried ${modelKeys.length} Models in Parallel • Filtered to ${data.selected_doc_ids.length} Document(s)`;
+            }
+
+            // If multiple models, render a Comparative Leaderboard first to help user see which model is best!
+            if (!isSingle && modelKeys.length > 1) {
+                const summaryList = modelKeys.map(mid => {
+                    const m = resultsByModel[mid];
+                    const topScore = m.hits && m.hits.length > 0 ? m.hits[0].score : 0.0;
+                    return { ...m, topScore };
+                }).sort((a, b) => b.topScore - a.topScore);
+
+                const benchDiv = document.createElement('div');
+                benchDiv.className = 'benchmark-summary';
+                benchDiv.style = 'grid-column: 1 / -1; margin-bottom: 20px;';
+
+                let rowsHtml = '';
+                summaryList.forEach((item, index) => {
+                    const isWinner = index === 0 && item.topScore > 0;
+                    const pct = (item.topScore * 100).toFixed(1);
+                    rowsHtml += `
+                        <tr style="${isWinner ? 'background: #1f6feb15;' : ''}">
+                            <td style="font-weight: 700; width: 50px;">
+                                ${isWinner ? '🏆 #1' : '#' + (index + 1)}
+                            </td>
+                            <td>
+                                <strong style="color: #e6edf3;">${escapeHtml(item.display_name)}</strong>
+                                ${isWinner ? '<span class="best-badge" style="margin-left: 8px;">Top Match</span>' : ''}
+                                <div style="font-size: 11px; color: #8b949e;">${item.dimensions}d • ${escapeHtml(item.languages)}</div>
+                            </td>
+                            <td style="font-weight: 700; color: #58a6ff;">
+                                ${pct}% <span style="font-size: 11px; color: #8b949e;">(${item.topScore.toFixed(4)})</span>
+                            </td>
+                            <td>
+                                ⚡ ${item.total_latency_ms} ms
+                                <span style="font-size: 10px; color: #8b949e;">(API: ${item.api_latency_ms}ms)</span>
+                            </td>
+                            <td>
+                                <button type="button" onclick="selectSearchModel('${item.model_id}'); handleSearch();" style="background: #21262d; border: 1px solid #30363d; color: #58a6ff; font-size: 11.5px; padding: 4px 10px; border-radius: 4px; cursor: pointer;">
+                                    Inspect Only
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                benchDiv.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #30363d; padding-bottom: 10px;">
+                        <div>
+                            <h3 style="font-size: 15px; font-weight: 700; color: #58a6ff;">📊 Multi-Model Benchmark Leaderboard</h3>
+                            <p style="font-size: 12px; color: #8b949e;">Side-by-side ranking of Cloudflare embedding models for this query.</p>
+                        </div>
+                    </div>
+                    <table class="benchmark-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Model Name</th>
+                                <th>Top Similarity Score</th>
+                                <th>Latency</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rowsHtml}</tbody>
+                    </table>
+                `;
+                grid.appendChild(benchDiv);
+            }
+
+            // Render Model Cards
             modelKeys.forEach(mid => {
                 const mData = resultsByModel[mid];
                 const card = document.createElement('div');
                 card.className = 'model-card';
+                if (isSingle) {
+                    card.style = 'grid-column: 1 / -1; border-color: #58a6ff66; background: #161b22;';
+                }
 
                 const hits = mData.hits || [];
                 let hitsHtml = '';
                 if (hits.length === 0) {
-                    hitsHtml = `<div style="color:#8b949e; font-size:12.5px; padding:12px; text-align:center;">No matching chunks found for this query in selected document(s).</div>`;
+                    hitsHtml = `<div style="color:#8b949e; font-size:12.5px; padding:16px; text-align:center;">No matching chunks found for this query in selected document(s).</div>`;
                 } else {
                     hits.forEach((h, idx) => {
+                        const scorePct = Math.min(Math.max((h.score * 100), 0), 100).toFixed(1);
                         hitsHtml += `
-                            <div class="hit-item">
+                            <div class="hit-item" style="${idx === 0 ? 'border-color: #388bfd55;' : ''}">
                                 <div class="hit-header">
-                                    <span>Rank #${idx + 1} • <strong style="color:#58a6ff;">${escapeHtml(h.doc_name)}</strong> (Chunk #${h.chunk_id})</span>
-                                    <span class="hit-score">Cosine: ${(h.score * 100).toFixed(1)}% (${h.score})</span>
+                                    <span>
+                                        <strong style="color: ${idx === 0 ? '#58a6ff' : '#c9d1d9'};">Rank #${idx + 1}</strong>
+                                        • <strong style="color:#58a6ff;">${escapeHtml(h.doc_name)}</strong>
+                                        <span style="color:#8b949e;">(Chunk #${h.chunk_id})</span>
+                                    </span>
+                                    <span class="hit-score">Cosine: ${scorePct}% <span style="font-size:11px; color:#8b949e;">(${h.score})</span></span>
+                                </div>
+                                <div class="match-bar-bg">
+                                    <div class="match-bar-fill" style="width: ${scorePct}%;"></div>
                                 </div>
                                 <div class="hit-text">${escapeHtml(h.text)}</div>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: 11px; color: #8b949e;">
+                                    <span>${h.char_count || h.text.length} chars</span>
+                                    <button onclick="navigator.clipboard.writeText(decodeURIComponent('${encodeURIComponent(h.text)}')); alert('Copied chunk text!');" style="background:#21262d; border:1px solid #30363d; color:#58a6ff; border-radius:3px; padding:2px 6px; font-size:10px; cursor:pointer;">Copy Chunk</button>
+                                </div>
                             </div>
                         `;
                     });
                 }
+
+                const apiBadge = mData.is_mock 
+                    ? `<span style="font-size:10.5px; background:#d2992222; border:1px solid #d2992255; color:#d29922; padding:2px 6px; border-radius:10px;">Simulated Vectors</span>`
+                    : `<span style="font-size:10.5px; background:#23863622; border:1px solid #23863655; color:#3fb950; padding:2px 6px; border-radius:10px;">🟢 Live Cloudflare API</span>`;
 
                 card.innerHTML = `
                     <div class="model-card-header">
@@ -961,9 +1195,10 @@ Main Content:
                             <div class="model-title">
                                 <span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${mData.badge_color || '#58a6ff'};"></span>
                                 ${escapeHtml(mData.display_name)}
+                                ${apiBadge}
                             </div>
                             <div style="font-size:12px; color:#8b949e; margin-top:2px;">
-                                ${mData.dimensions}d • ${escapeHtml(mData.languages)}
+                                ${mData.dimensions}d vector dimensions • ${escapeHtml(mData.languages)}
                             </div>
                         </div>
                         <div class="latency-badge">
@@ -1079,8 +1314,35 @@ Main Content:
                 if (d.status === 'success') {
                     alert('Cloudflare credentials saved successfully!');
                     closeSettingsModal();
+                    checkCloudflareStatus();
                 } else { alert('Error: ' + d.error); }
             } catch (e) { alert(e.message); }
+        }
+
+        async function checkCloudflareStatus() {
+            try {
+                const res = await fetch('/api/models');
+                const data = await res.json();
+                const badge = document.getElementById('cfStatusBadge');
+                if (!badge) return;
+                if (data.is_configured) {
+                    badge.innerHTML = '🟢 Cloudflare Workers AI Active';
+                    badge.style.background = '#23863622';
+                    badge.style.borderColor = '#23863666';
+                    badge.style.color = '#3fb950';
+                } else {
+                    badge.innerHTML = '⚠️ Connect Cloudflare API';
+                    badge.style.background = '#d2992222';
+                    badge.style.borderColor = '#d2992266';
+                    badge.style.color = '#d29922';
+                }
+                if (data.account_id) {
+                    const accInput = document.getElementById('cfAccountId');
+                    if (accInput && !accInput.value) accInput.value = data.account_id;
+                }
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function escapeHtml(str) {
@@ -1089,6 +1351,7 @@ Main Content:
         }
 
         // Initial load
+        checkCloudflareStatus();
         loadDocumentsForSearch();
     </script>
 </body>

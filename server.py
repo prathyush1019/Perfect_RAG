@@ -237,14 +237,29 @@ class ChunkingHandler(BaseHTTPRequestHandler):
 
             query = payload.get("query", "").strip()
             selected_doc_ids = payload.get("selected_doc_ids") or payload.get("doc_ids") or []
-            model_ids = payload.get("model_ids") or AVAILABLE_MODEL_IDS
+
+            # Support selecting a single model or multiple models or 'all'
+            single_model = payload.get("model_id")
+            model_ids = payload.get("model_ids")
+            if single_model and single_model.lower() != "all":
+                model_ids = [single_model]
+            elif not model_ids or (isinstance(model_ids, str) and model_ids.lower() == "all"):
+                model_ids = AVAILABLE_MODEL_IDS
+            elif isinstance(model_ids, str):
+                model_ids = [model_ids]
+
+            # Filter valid models only
+            valid_model_ids = [mid for mid in model_ids if mid in ALL_CLOUDFLARE_MODELS]
+            if not valid_model_ids:
+                valid_model_ids = AVAILABLE_MODEL_IDS
+
             top_k = int(payload.get("top_k", 4))
 
             if not query:
                 self._send_json({"error": "Query cannot be empty"}, 400)
                 return
 
-            # Parallel query search across all models
+            # Query search across chosen model(s)
             def _search_single_model(mid):
                 m_cfg = ALL_CLOUDFLARE_MODELS.get(mid)
                 if not m_cfg:
@@ -256,6 +271,7 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     doc_ids=selected_doc_ids,
                     top_k=top_k
                 )
+                meta = embedder.last_fetch_meta.get(mid, {})
                 return {
                     "model_id": mid,
                     "display_name": m_cfg.display_name,
@@ -263,6 +279,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     "languages": m_cfg.languages,
                     "badge_color": m_cfg.badge_color,
                     "is_multilingual": m_cfg.is_multilingual,
+                    "is_mock": meta.get("is_mock", not embedder.is_configured()),
+                    "api_source": meta.get("source", "live_cloudflare_api" if embedder.is_configured() else "offline_simulation"),
                     "api_latency_ms": round(api_lat, 2),
                     "qdrant_latency_ms": round(qdrant_lat, 2),
                     "total_latency_ms": round(api_lat + qdrant_lat, 2),
@@ -270,14 +288,16 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     "matches": hits
                 }
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(model_ids), 7)) as executor:
-                model_results = list(executor.map(_search_single_model, model_ids))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(valid_model_ids), 7)) as executor:
+                model_results = list(executor.map(_search_single_model, valid_model_ids))
 
             results_dict = {r["model_id"]: r for r in model_results if r is not None}
 
             self._send_json({
                 "query": query,
                 "selected_doc_ids": selected_doc_ids,
+                "selected_model_ids": valid_model_ids,
+                "is_single_model": len(valid_model_ids) == 1,
                 "results_by_model": results_dict,
                 "results": results_dict
             })
@@ -328,6 +348,18 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 env_lines.append(f"CLOUDFLARE_API_TOKEN={api_token}\n")
                 with open(env_path, "w", encoding="utf-8") as f:
                     f.writelines(env_lines)
+
+                # Also sync with chunking_studio/.env
+                studio_env_path = os.path.join(BASE_DIR, "chunking_studio", ".env")
+                if os.path.exists(os.path.dirname(studio_env_path)):
+                    s_lines = []
+                    if os.path.exists(studio_env_path):
+                        with open(studio_env_path, "r", encoding="utf-8") as f:
+                            s_lines = [l for l in f.readlines() if not l.startswith("CLOUDFLARE_")]
+                    s_lines.append(f"CLOUDFLARE_ACCOUNT_ID={account_id}\n")
+                    s_lines.append(f"CLOUDFLARE_API_TOKEN={api_token}\n")
+                    with open(studio_env_path, "w", encoding="utf-8") as f:
+                        f.writelines(s_lines)
 
                 self._send_json({"status": "success", "is_configured": True})
             else:
