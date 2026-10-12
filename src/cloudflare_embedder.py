@@ -5,6 +5,7 @@ High-Performance Cloudflare Workers AI Embedder Client with Connection Pooling &
 import os
 import time
 import hashlib
+import collections
 from typing import List, Dict, Any, Tuple, Optional
 import requests
 from requests.adapters import HTTPAdapter
@@ -40,6 +41,7 @@ class CloudflareEmbedder:
         self.enable_mock_fallback = enable_mock_fallback
         self.last_fetch_meta: Dict[str, Any] = {}
         self._last_used_mock = False
+        self.logs: collections.deque = collections.deque(maxlen=200)
 
         # Build persistent connection pool
         self.session = requests.Session()
@@ -56,6 +58,40 @@ class CloudflareEmbedder:
         )
         self.session.mount("https://", adapter)
         self.session.mount("http://", adapter)
+
+    def _record_log(
+        self,
+        level: str,
+        model_id: str,
+        endpoint: str,
+        status_code: int,
+        latency_ms: float,
+        message: str,
+        dims: int = 0,
+        count: int = 1,
+        raw_response: Optional[str] = None
+    ):
+        """Append an entry to the in-memory circular log buffer for UI inspection."""
+        model_cfg = ALL_CLOUDFLARE_MODELS.get(model_id)
+        entry = {
+            "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "time_short": time.strftime("%H:%M:%S"),
+            "level": level,  # SUCCESS, INFO, WARN, ERROR
+            "model_id": model_id,
+            "display_name": model_cfg.display_name if model_cfg else model_id,
+            "endpoint": endpoint,
+            "status_code": status_code,
+            "latency_ms": round(latency_ms, 1),
+            "dimensions": dims,
+            "count": count,
+            "message": message,
+            "raw_response": raw_response
+        }
+        self.logs.append(entry)
+
+    def get_recent_logs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        """Return the most recent log entries up to limit."""
+        return list(self.logs)[-limit:]
 
     def is_configured(self) -> bool:
         """Returns True if valid Cloudflare credentials are provided."""
@@ -127,10 +163,12 @@ class CloudflareEmbedder:
             if self.enable_mock_fallback:
                 self._last_used_mock = True
                 vectors, sim_ms = self._generate_synthetic_embeddings(texts, target_dims)
+                msg = f"Credentials not configured. Generated {len(vectors)} pseudo-vector(s) ({target_dims}d) in simulation mode."
+                self._record_log("WARN", model_id, self.get_api_url(model_id), 401, sim_ms, msg, dims=target_dims, count=len(texts))
                 self.last_fetch_meta[model_id] = {
                     "source": "offline_simulation",
                     "is_mock": True,
-                    "status_code": 200,
+                    "status_code": 401,
                     "dimensions": target_dims,
                     "vector_sample": [round(x, 4) for x in vectors[0][:5]] if vectors else [],
                     "norm": 1.0
@@ -166,16 +204,30 @@ class CloudflareEmbedder:
                     res_json = response.json()
                     batch_vectors = self._extract_vectors_from_response(res_json, len(batch), target_dims)
                     all_embeddings.extend(batch_vectors)
+                    dims = len(batch_vectors[0]) if batch_vectors else target_dims
+                    log_text = f"HTTP 200 OK | Returned {len(batch_vectors)} vector(s) of {dims}d in {batch_latency_ms:.1f}ms"
+                    try:
+                        print(f"[Cloudflare AI] [SUCCESS] {model_id} | {log_text}")
+                    except Exception:
+                        pass
+                    self._record_log("SUCCESS", model_id, url, 200, batch_latency_ms, log_text, dims=dims, count=len(batch))
                     self.last_fetch_meta[model_id] = {
                         "source": "live_cloudflare_api",
                         "is_mock": False,
                         "status_code": 200,
-                        "dimensions": len(batch_vectors[0]) if batch_vectors else target_dims,
+                        "dimensions": dims,
+                        "endpoint": url,
                         "vector_sample": [round(x, 4) for x in batch_vectors[0][:5]] if batch_vectors else [],
                         "norm": round(float(np.linalg.norm(batch_vectors[0])), 4) if batch_vectors else 0.0
                     }
                 else:
                     error_msg = f"Cloudflare API returned status {response.status_code}: {response.text}"
+                    log_text = f"HTTP {response.status_code} ERROR | Response: {response.text[:300]}"
+                    try:
+                        print(f"[Cloudflare AI] [ERROR] {model_id} | {log_text}")
+                    except Exception:
+                        pass
+                    self._record_log("ERROR", model_id, url, response.status_code, batch_latency_ms, log_text, dims=target_dims, count=len(batch), raw_response=response.text[:1000])
                     if self.enable_mock_fallback and not is_warmup:
                         self._last_used_mock = True
                         vectors, _ = self._generate_synthetic_embeddings(batch, target_dims)
@@ -184,7 +236,8 @@ class CloudflareEmbedder:
                             "source": "fallback_simulation",
                             "is_mock": True,
                             "status_code": response.status_code,
-                            "error": response.text[:200],
+                            "error": response.text[:300],
+                            "endpoint": url,
                             "dimensions": target_dims,
                             "vector_sample": [round(x, 4) for x in vectors[0][:5]] if vectors else [],
                             "norm": 1.0
@@ -193,6 +246,13 @@ class CloudflareEmbedder:
                         raise RuntimeError(error_msg)
 
             except Exception as ex:
+                batch_latency_ms = (time.perf_counter() - start_t) * 1000.0
+                log_text = f"Request Exception: {str(ex)}"
+                try:
+                    print(f"[Cloudflare AI] [EXCEPTION] {model_id}: {log_text}")
+                except Exception:
+                    pass
+                self._record_log("ERROR", model_id, url, 0, batch_latency_ms, log_text, dims=target_dims, count=len(batch))
                 if self.enable_mock_fallback and not is_warmup:
                     self._last_used_mock = True
                     vectors, _ = self._generate_synthetic_embeddings(batch, target_dims)
@@ -202,6 +262,7 @@ class CloudflareEmbedder:
                         "source": "fallback_simulation",
                         "is_mock": True,
                         "error": str(ex),
+                        "endpoint": url,
                         "dimensions": target_dims,
                         "vector_sample": [round(x, 4) for x in vectors[0][:5]] if vectors else [],
                         "norm": 1.0
@@ -289,6 +350,7 @@ class CloudflareEmbedder:
             vectors.append(v.tolist())
 
         lat_ms = (time.perf_counter() - t0) * 1000.0
+        self._record_log("SUCCESS", model_id, "Google Gemini API (gemini-embedding-001)", 200, lat_ms, f"Generated {len(vectors)} vectors (3072d) via Gemini API", dims=3072, count=len(texts))
         self.last_fetch_meta[model_id] = {
             "source": "live_gemini_api",
             "is_mock": False,

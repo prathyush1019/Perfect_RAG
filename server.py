@@ -76,6 +76,23 @@ class ChunkingHandler(BaseHTTPRequestHandler):
             self._send_json({"documents": docs, "stats": stats})
             return
 
+        elif parsed.path == "/api/logs":
+            token_display = "Not set"
+            if embedder.api_token:
+                token_display = f"{embedder.api_token[:7]}...{embedder.api_token[-4:]}"
+            elif embedder.global_api_key:
+                token_display = f"Global Key ({embedder.auth_email})"
+
+            self._send_json({
+                "status": "ok",
+                "cloudflare_configured": embedder.is_configured(),
+                "account_id": f"{embedder.account_id[:6]}...{embedder.account_id[-4:]}" if len(embedder.account_id) > 10 else embedder.account_id,
+                "token_masked": token_display,
+                "is_mock_fallback_active": embedder._last_used_mock,
+                "logs": embedder.get_recent_logs(limit=100)
+            })
+            return
+
         self.send_error(404, "Not Found")
 
     def do_POST(self):
@@ -251,7 +268,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 "chunks_count": len(chunks),
                 "api_latencies": api_latencies,
                 "upsert_results": upsert_results,
-                "models_count": len(embeddings_by_model)
+                "models_count": len(embeddings_by_model),
+                "recent_logs": embedder.get_recent_logs(limit=30)
             })
 
         elif parsed.path == "/api/search":
@@ -300,6 +318,29 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     top_k=top_k
                 )
                 meta = embedder.last_fetch_meta.get(mid, {})
+                sc = meta.get("status_code", 200)
+                err = meta.get("error")
+                ep = embedder.get_api_url(mid) if "gemini" not in mid else "Google GenAI API"
+                top_score = hits[0]["score"] if hits else 0.0
+                log_line = f"[Search] {m_cfg.display_name} ({mid}) -> Cloudflare: HTTP {sc} ({api_lat:.1f}ms, {len(q_vec)}d) | Qdrant: {len(hits)} hits ({qdrant_lat:.1f}ms, top: {top_score:.4f}) | Filter: {selected_doc_ids}"
+                if err:
+                    log_line += f" | Error: {err}"
+                print(log_line)
+
+                # Record Qdrant search retrieval step in embedder logs
+                qdrant_status_msg = f"Retrieved {len(hits)} chunk(s) (Top: {top_score:.4f}) in {qdrant_lat:.1f}ms | Filter: {selected_doc_ids}" if hits else f"0 matching chunks found in Qdrant for filter {selected_doc_ids}"
+                level = "SUCCESS" if hits else "WARN"
+                embedder._record_log(
+                    level=level,
+                    model_id=mid,
+                    endpoint=f"Qdrant HNSW ('{qdrant_manager.get_collection_name(mid)}')",
+                    status_code=200 if hits else 404,
+                    latency_ms=qdrant_lat,
+                    message=qdrant_status_msg,
+                    dims=len(q_vec),
+                    count=len(hits)
+                )
+
                 return {
                     "model_id": mid,
                     "display_name": m_cfg.display_name,
@@ -309,12 +350,26 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     "is_multilingual": m_cfg.is_multilingual,
                     "is_mock": meta.get("is_mock", False),
                     "api_source": meta.get("source", "live_cloudflare_api" if "gemini" not in mid else "live_gemini_api"),
-                    "api_error": meta.get("error"),
+                    "api_error": err,
+                    "api_status_code": sc,
                     "api_latency_ms": round(api_lat, 2),
                     "qdrant_latency_ms": round(qdrant_lat, 2),
                     "total_latency_ms": round(api_lat + qdrant_lat, 2),
                     "hits": hits,
-                    "matches": hits
+                    "matches": hits,
+                    "log_entry": {
+                        "time": time.strftime("%H:%M:%S"),
+                        "model": m_cfg.display_name,
+                        "model_id": mid,
+                        "endpoint": ep,
+                        "status": sc,
+                        "api_latency_ms": round(api_lat, 1),
+                        "qdrant_latency_ms": round(qdrant_lat, 1),
+                        "dims": len(q_vec),
+                        "hits_count": len(hits),
+                        "filtered_docs": selected_doc_ids,
+                        "error": err
+                    }
                 }
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=min(len(valid_model_ids), 7)) as executor:
@@ -328,7 +383,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 "selected_model_ids": valid_model_ids,
                 "is_single_model": len(valid_model_ids) == 1,
                 "results_by_model": results_dict,
-                "results": results_dict
+                "results": results_dict,
+                "recent_logs": embedder.get_recent_logs(limit=40)
             })
 
         elif parsed.path == "/api/delete_document":

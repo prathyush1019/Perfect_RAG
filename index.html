@@ -480,6 +480,7 @@
                 <p class="subtitle">Context-Augmented Chunking • 7 Cloudflare Embedding Models • Multi-Document Filtered Search</p>
             </div>
             <div class="header-actions">
+                <button class="btn-settings" onclick="scrollToLogs()" style="color:#58a6ff; border-color:#388bfd55; background:#1f6feb15;">📋 Cloudflare Live Logs</button>
                 <span id="cfStatusBadge" onclick="openSettingsModal()" style="cursor:pointer; font-size:12px; padding:6px 12px; border-radius:20px; display:inline-flex; align-items:center; gap:6px; font-weight:500; background:#21262d; border:1px solid #30363d; color:#8b949e;">
                     ⏳ Checking API...
                 </span>
@@ -658,6 +659,29 @@
                     <span id="searchMetricsPill" style="font-size: 12px; color: #8b949e;"></span>
                 </div>
                 <div class="model-results-grid" id="modelResultsGrid"></div>
+            </div>
+
+            <!-- Cloudflare AI & Pipeline Live Logs Console -->
+            <div class="card" id="cloudflareLogsSection" style="margin-top: 24px; border-color: #30363d; background: #161b22;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <h3 style="font-size: 15px; font-weight: 700; color: #58a6ff; display: flex; align-items: center; gap: 6px;">
+                            <span>⚡ Cloudflare AI & Retrieval Live Diagnostics Log</span>
+                        </h3>
+                        <span id="cfLogCountBadge" style="font-size: 11px; background: #21262d; border: 1px solid #30363d; color: #8b949e; padding: 2px 8px; border-radius: 12px;">0 entries</span>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" onclick="fetchLatestLogs()" style="background: #21262d; border: 1px solid #30363d; color: #58a6ff; font-size: 12px; padding: 5px 12px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                            🔄 Refresh Logs
+                        </button>
+                        <button type="button" onclick="clearLogsUi()" style="background: #21262d; border: 1px solid #30363d; color: #8b949e; font-size: 12px; padding: 5px 10px; border-radius: 6px; cursor: pointer;">
+                            Clear View
+                        </button>
+                    </div>
+                </div>
+                <div id="cfLogViewer" style="background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 12px; font-family: 'JetBrains Mono', monospace; font-size: 11.5px; line-height: 1.6; max-height: 360px; overflow-y: auto;">
+                    <div style="color: #8b949e;">Ready. Run an embedding or search query to inspect real-time Cloudflare Workers AI and Qdrant logs.</div>
+                </div>
             </div>
         </div>
 
@@ -957,6 +981,7 @@ Main Content:
                     </div>
                 `;
                 loadDocumentsForSearch();
+                if (data.recent_logs) renderLogs(data.recent_logs);
             } catch (err) {
                 box.innerHTML = `<span style="color:#f85149;">❌ Failed: ${err.message}</span>`;
             } finally {
@@ -987,9 +1012,11 @@ Main Content:
                 return;
             }
 
-            // Select all by default if none selected
+            // Filter out any stale doc_ids that no longer exist in availableDocs
+            const availableIds = availableDocs.map(d => d.doc_id);
+            selectedDocIds = selectedDocIds.filter(id => availableIds.includes(id));
             if (selectedDocIds.length === 0) {
-                selectedDocIds = availableDocs.map(d => d.doc_id);
+                selectedDocIds = [...availableIds];
             }
 
             container.innerHTML = '';
@@ -1197,7 +1224,18 @@ Main Content:
                 const hits = mData.hits || [];
                 let hitsHtml = '';
                 if (hits.length === 0) {
-                    hitsHtml = `<div style="color:#8b949e; font-size:12.5px; padding:16px; text-align:center;">No matching chunks found for this query in selected document(s).</div>`;
+                    hitsHtml = `
+                        <div style="background: #161b22; border: 1px dashed #30363d; border-radius: 6px; padding: 14px; margin: 10px 0; text-align: center;">
+                            <div style="color: #e3b341; font-weight: 600; font-size: 13px; margin-bottom: 6px;">
+                                ⚠️ No matching chunks found for this query in selected document(s).
+                            </div>
+                            <div style="color: #8b949e; font-size: 12px; line-height: 1.6; max-width: 600px; margin: 0 auto;">
+                                Cloudflare API generated <strong>${mData.dimensions}d</strong> vector in <strong>${mData.api_latency_ms}ms</strong>, but Qdrant retrieved 0 results.<br>
+                                <strong>Active Document Filter:</strong> <code>${JSON.stringify(data.selected_doc_ids || [])}</code><br>
+                                💡 <strong>Tip:</strong> If the document checkbox was unchecked above, check it in <em>Filter Search by Specific Document(s)</em> or click <strong>[Select All]</strong>.
+                            </div>
+                        </div>
+                    `;
                 } else {
                     hits.forEach((h, idx) => {
                         const scorePct = Math.min(Math.max((h.score * 100), 0), 100).toFixed(1);
@@ -1233,6 +1271,22 @@ Main Content:
                     apiBadge = `<span style="font-size:10.5px; background:#23863622; border:1px solid #23863655; color:#3fb950; padding:2px 8px; border-radius:10px;">🟢 Live Cloudflare API</span>`;
                 }
 
+                const logDetails = `
+                    <details style="margin: 8px 0 12px; font-size: 11px; background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px 10px;">
+                        <summary style="cursor: pointer; color: #58a6ff; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
+                            <span>🌐 Cloudflare API & Retrieval Log Details</span>
+                            <span style="font-size: 10px; color: ${mData.api_status_code === 200 ? '#3fb950' : '#f85149'};">HTTP ${mData.api_status_code} • ${mData.api_latency_ms}ms</span>
+                        </summary>
+                        <div style="margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: #c9d1d9; border-top: 1px solid #21262d; padding-top: 8px; word-break: break-all;">
+                            <div><span style="color:#8b949e;">Cloudflare Endpoint:</span> <code style="color:#79c0ff;">${escapeHtml(mData.log_entry?.endpoint || '')}</code></div>
+                            <div><span style="color:#8b949e;">Status:</span> <strong style="color:${mData.api_status_code === 200 ? '#3fb950' : '#f85149'};">HTTP ${mData.api_status_code}</strong> | <span style="color:#8b949e;">API Latency:</span> <span style="color:#e3b341;">${mData.api_latency_ms} ms</span> | <span style="color:#8b949e;">Dimensions:</span> <strong>${mData.dimensions}d</strong></div>
+                            <div><span style="color:#8b949e;">Qdrant Filter:</span> <code style="color:#a5d6ff;">${JSON.stringify(data.selected_doc_ids || [])}</code> | <span style="color:#8b949e;">Qdrant Latency:</span> <span style="color:#e3b341;">${mData.qdrant_latency_ms} ms</span></div>
+                            <div><span style="color:#8b949e;">Retrieved Matches:</span> <strong style="color:${hits.length > 0 ? '#3fb950' : '#e3b341'};">${hits.length} chunks</strong></div>
+                            ${mData.api_error ? `<div style="color:#f85149; margin-top:4px; font-weight:600;">❌ API Error: ${escapeHtml(mData.api_error)}</div>` : ''}
+                        </div>
+                    </details>
+                `;
+
                 card.innerHTML = `
                     <div class="model-card-header">
                         <div>
@@ -1249,10 +1303,15 @@ Main Content:
                             ⚡ ${mData.total_latency_ms} ms <span style="font-size:10px; color:#8b949e;">(API: ${mData.api_latency_ms}ms | Qdrant: ${mData.qdrant_latency_ms}ms)</span>
                         </div>
                     </div>
+                    ${logDetails}
                     <div>${hitsHtml}</div>
                 `;
                 grid.appendChild(card);
             });
+
+            if (data.recent_logs) {
+                renderLogs(data.recent_logs);
+            }
 
             sec.scrollIntoView({ behavior: 'smooth' });
         }
@@ -1389,6 +1448,92 @@ Main Content:
             }
         }
 
+        async function fetchLatestLogs() {
+            try {
+                const res = await fetch('/api/logs');
+                const data = await res.json();
+                if (data.logs) {
+                    renderLogs(data.logs);
+                }
+            } catch (e) {
+                console.error("Failed to fetch logs", e);
+            }
+        }
+
+        function clearLogsUi() {
+            const viewer = document.getElementById('cfLogViewer');
+            if (viewer) {
+                viewer.innerHTML = '<div style="color: #8b949e;">Log view cleared. New events will appear here.</div>';
+            }
+            const countBadge = document.getElementById('cfLogCountBadge');
+            if (countBadge) countBadge.innerText = '0 entries';
+        }
+
+        function renderLogs(logs) {
+            const viewer = document.getElementById('cfLogViewer');
+            const countBadge = document.getElementById('cfLogCountBadge');
+            if (!viewer) return;
+            if (!logs || logs.length === 0) {
+                viewer.innerHTML = '<div style="color: #8b949e;">No logs recorded yet.</div>';
+                if (countBadge) countBadge.innerText = '0 entries';
+                return;
+            }
+
+            if (countBadge) countBadge.innerText = `${logs.length} entries`;
+
+            let html = '';
+            // Render logs in reverse chronological order so newest is at the top
+            const reversedLogs = [...logs].reverse();
+            reversedLogs.forEach(item => {
+                let badgeStyle = 'background:#21262d; color:#8b949e;';
+                let icon = 'ℹ️';
+                if (item.level === 'SUCCESS') {
+                    badgeStyle = 'background:#23863633; color:#3fb950; border:1px solid #23863666;';
+                    icon = '✅';
+                } else if (item.level === 'ERROR') {
+                    badgeStyle = 'background:#da363333; color:#f85149; border:1px solid #da363366;';
+                    icon = '❌';
+                } else if (item.level === 'WARN') {
+                    badgeStyle = 'background:#d2992233; color:#d29922; border:1px solid #d2992266;';
+                    icon = '⚠️';
+                }
+
+                html += `
+                    <div style="margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #21262d; font-family: 'JetBrains Mono', monospace;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <div>
+                                <span style="color:#8b949e; font-size:11px;">[${escapeHtml(item.time_short || item.timestamp)}]</span>
+                                <span style="display:inline-block; font-size:10px; padding:1px 6px; border-radius:4px; font-weight:600; margin-left:4px; ${badgeStyle}">${icon} ${item.level}</span>
+                                <span style="color:#58a6ff; font-weight:600; margin-left:6px;">${escapeHtml(item.display_name || item.model_id)}</span>
+                            </div>
+                            <span style="font-size:11px; color:#e3b341;">${item.latency_ms ? item.latency_ms + ' ms' : ''}</span>
+                        </div>
+                        <div style="color:#c9d1d9; margin-top:4px; font-size:11.5px;">
+                            ${escapeHtml(item.message)}
+                        </div>
+                        <div style="color:#8b949e; font-size:10.5px; margin-top:2px;">
+                            Endpoint: <code style="color:#79c0ff;">${escapeHtml(item.endpoint || '')}</code>
+                            ${item.dimensions ? ` • <span style="color:#a5d6ff;">${item.dimensions}d</span>` : ''}
+                        </div>
+                        ${item.raw_response ? `
+                            <details style="margin-top:4px;">
+                                <summary style="color:#f85149; cursor:pointer; font-size:10.5px;">View Raw Error Response</summary>
+                                <pre style="background:#00000044; color:#f85149; padding:6px; border-radius:4px; font-size:10.5px; margin-top:4px; white-space:pre-wrap; overflow-x:auto;">${escapeHtml(item.raw_response)}</pre>
+                            </details>
+                        ` : ''}
+                    </div>
+                `;
+            });
+
+            viewer.innerHTML = html;
+        }
+
+        function scrollToLogs() {
+            switchTab('search');
+            const el = document.getElementById('cloudflareLogsSection');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
+
         function escapeHtml(str) {
             if (!str) return '';
             return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -1397,6 +1542,7 @@ Main Content:
         // Initial load
         checkCloudflareStatus();
         loadDocumentsForSearch();
+        fetchLatestLogs();
     </script>
 </body>
 </html>
