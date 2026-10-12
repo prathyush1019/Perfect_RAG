@@ -6,11 +6,18 @@ import os
 import time
 import hashlib
 import collections
+import json
 from typing import List, Dict, Any, Tuple, Optional
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import numpy as np
+
+try:
+    import orjson
+    HAS_ORJSON = True
+except ImportError:
+    HAS_ORJSON = False
 
 from src.cloudflare_config import (
     ALL_CLOUDFLARE_MODELS,
@@ -188,21 +195,30 @@ class CloudflareEmbedder:
         # Process in batches
         for i in range(0, len(texts), batch_size):
             batch = texts[i : i + batch_size]
-            payload = {"text": batch}
+            # When batch has 1 item, pass single string to skip batch tensor slicing on Cloudflare
+            payload = {"text": batch[0] if len(batch) == 1 else batch}
 
             start_t = time.perf_counter()
             try:
+                if HAS_ORJSON:
+                    body_bytes = orjson.dumps(payload)
+                else:
+                    body_bytes = json.dumps(payload).encode("utf-8")
+
                 response = self.session.post(
                     url,
                     headers=headers,
-                    json=payload,
+                    data=body_bytes,
                     timeout=self.timeout
                 )
                 batch_latency_ms = (time.perf_counter() - start_t) * 1000.0
                 total_api_time_ms += batch_latency_ms
 
                 if response.status_code == 200:
-                    res_json = response.json()
+                    if HAS_ORJSON:
+                        res_json = orjson.loads(response.content)
+                    else:
+                        res_json = response.json()
                     batch_vectors = self._extract_vectors_from_response(res_json, len(batch), target_dims)
                     all_embeddings.extend(batch_vectors)
                     dims = len(batch_vectors[0]) if batch_vectors else target_dims
@@ -281,7 +297,8 @@ class CloudflareEmbedder:
             Tuple of (vector, api_latency_ms)
         """
         norm_query = query.strip()
-        cache_key = (model_id, norm_query.lower())
+        clean_key = norm_query.lower().strip("?!.,;:\"' \t\n\r")
+        cache_key = (model_id, clean_key)
         if cache_key in self._query_vector_cache:
             cached_vector = self._query_vector_cache[cache_key]
             self._record_log(
