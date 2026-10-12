@@ -34,6 +34,8 @@ class CloudflareEmbedder:
     ):
         self.account_id = (account_id or os.getenv("CLOUDFLARE_ACCOUNT_ID") or CLOUDFLARE_ACCOUNT_ID).strip()
         self.api_token = (api_token or os.getenv("CLOUDFLARE_API_TOKEN") or CLOUDFLARE_API_TOKEN).strip()
+        self.auth_email = (os.getenv("CLOUDFLARE_AUTH_EMAIL") or "").strip()
+        self.global_api_key = (os.getenv("CLOUDFLARE_GLOBAL_API_KEY") or "").strip()
         self.timeout = timeout
         self.enable_mock_fallback = enable_mock_fallback
         self.last_fetch_meta: Dict[str, Any] = {}
@@ -57,7 +59,19 @@ class CloudflareEmbedder:
 
     def is_configured(self) -> bool:
         """Returns True if valid Cloudflare credentials are provided."""
-        return bool(self.account_id and self.api_token)
+        has_token = bool(self.account_id and self.api_token)
+        has_global = bool(self.account_id and self.auth_email and self.global_api_key)
+        return has_token or has_global
+
+    def _get_auth_headers(self) -> Dict[str, str]:
+        """Returns appropriate authentication headers (Bearer token or Global API Key)."""
+        headers = {"Content-Type": "application/json"}
+        if self.global_api_key and self.auth_email:
+            headers["X-Auth-Email"] = self.auth_email
+            headers["X-Auth-Key"] = self.global_api_key
+        else:
+            headers["Authorization"] = f"Bearer {self.api_token}"
+        return headers
 
     def get_api_url(self, model_id: str) -> str:
         """Construct the REST inference endpoint for a model."""
@@ -130,10 +144,7 @@ class CloudflareEmbedder:
         total_api_time_ms = 0.0
 
         url = self.get_api_url(model_id)
-        headers = {
-            "Authorization": f"Bearer {self.api_token}",
-            "Content-Type": "application/json"
-        }
+        headers = self._get_auth_headers()
 
         # Process in batches
         for i in range(0, len(texts), batch_size):
