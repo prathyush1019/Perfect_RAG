@@ -8,6 +8,7 @@ from typing import Dict, List
 from dotenv import load_dotenv
 
 load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "chunking_studio", ".env"))
 
 # Cloudflare Credentials
 CLOUDFLARE_ACCOUNT_ID = os.getenv("CLOUDFLARE_ACCOUNT_ID", "")

@@ -62,7 +62,11 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 }
                 for cfg in ALL_CLOUDFLARE_MODELS.values()
             ]
-            self._send_json({"models": models_list, "is_configured": embedder.is_configured()})
+            self._send_json({
+                "models": models_list,
+                "is_configured": embedder.is_configured(),
+                "account_id": embedder.account_id
+            })
             return
 
         elif parsed.path == "/api/documents":
