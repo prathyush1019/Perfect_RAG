@@ -127,12 +127,18 @@ class ChunkingHandler(BaseHTTPRequestHandler):
             final_chunks = []
             curr_id = 1
             for c in raw_chunks:
-                c_text = c.text or c.searchable_augmented_text or c.raw_text
+                c_text = (c.text or c.searchable_augmented_text or c.raw_text or "").strip()
+                # Discard degenerate / solitary symbol chunks (e.g., solitary '#')
+                if len(re.findall(r"\w", c_text, re.UNICODE)) < 2:
+                    continue
+
                 if count_units(c_text, unit) > chunk_size:
                     entity_title = c.metadata.get("branch_name") or (c_text.splitlines()[0].strip() if c_text.splitlines() else "Entity")
                     sub_pieces = split_text_to_ceiling(c_text, chunk_size, unit)
                     total_sub = len(sub_pieces)
                     for sub_idx, sub in enumerate(sub_pieces, 1):
+                        if len(re.findall(r"\w", sub.strip(), re.UNICODE)) < 2:
+                            continue
                         anchored_sub = sub
                         if sub_idx > 1 and entity_title and entity_title not in sub[:120]:
                             anchored_sub = f"[{entity_title} (Part {sub_idx}/{total_sub})]\n" + sub

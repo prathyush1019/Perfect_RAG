@@ -72,7 +72,9 @@ class HybridCompositeChunker(BaseChunker):
 
             # Adjust offsets to master document and re-index sequentially
             for c in zone_chunks:
-                if not (c.text or c.raw_text).strip():
+                c_clean = (c.text or c.raw_text or "").strip()
+                # Ignore chunks with no actual alphanumeric words (solitary '#', '---', single punctuation)
+                if len(re.findall(r"\w", c_clean, re.UNICODE)) < 2:
                     continue
                 c.chunk_id = global_chunk_id
                 c.start_char = zone_start + c.start_char
@@ -89,9 +91,9 @@ class HybridCompositeChunker(BaseChunker):
         # Split text on primary markdown headers # or ## while preserving character offsets.
         # If no ## exist, fallback to ###.
         has_h2 = bool(re.search(r"(?:^|\n)#{1,2}\s+[^\n]+", text))
-        header_regex_str = r"(?=(?:^|\n)#{1,2}\s+[^\n]+)" if has_h2 else r"(?=(?:^|\n)#{1,3}\s+[^\n]+)"
-        header_pattern = re.compile(header_regex_str, re.MULTILINE)
-        split_positions = [m.start() if m.start() == 0 else m.start() + 1 for m in header_pattern.finditer(text)]
+        header_regex_str = r"(?:^|\n)(#{1,2}\s+[^\n]+)" if has_h2 else r"(?:^|\n)(#{1,3}\s+[^\n]+)"
+        header_pattern = re.compile(header_regex_str)
+        split_positions = [m.start(1) for m in header_pattern.finditer(text)]
 
         if not split_positions or split_positions[0] != 0:
             split_positions = [0] + split_positions
@@ -106,7 +108,8 @@ class HybridCompositeChunker(BaseChunker):
             s = split_positions[i]
             e = split_positions[i + 1]
             sec_text = text[s:e]
-            if sec_text.strip():
+            # Must have at least 2 alphanumeric/word characters
+            if len(re.findall(r"\w", sec_text, re.UNICODE)) >= 2:
                 raw_sections.append({
                     "start": s,
                     "end": e,

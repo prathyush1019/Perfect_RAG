@@ -74,6 +74,8 @@ class SemanticSentenceChunker(BaseChunker):
             sentences.append((s_text, s_start, s_end, w_count, metric))
 
         if not sentences:
+            if len(re.findall(r"\w", text, re.UNICODE)) < 2:
+                return []
             w_count = len(text.split())
             return [
                 ChunkResult(
@@ -112,30 +114,31 @@ class SemanticSentenceChunker(BaseChunker):
             chunk_end_char = selected_sentences[-1][2]
             raw_chunk_text = text[chunk_start_char:chunk_end_char].strip()
 
-            searchable = build_searchable_augmented_text(
-                raw_chunk_text,
-                meta,
-                section_context="Policy & General Prose"
-            )
-            spoken = clean_for_speech(raw_chunk_text, meta)
-            chunks.append(
-                ChunkResult(
-                    chunk_id=chunk_id,
-                    start_char=chunk_start_char,
-                    end_char=chunk_end_char,
-                    text=raw_chunk_text,
-                    raw_text=raw_chunk_text,
-                    searchable_augmented_text=raw_chunk_text,
-                    chunk_type="semantic",
-                    warnings=[],
-                    metadata={
-                        **meta,
-                        "unit": self.unit,
-                        "sentence_count": len(selected_sentences),
-                    }
+            if len(re.findall(r"\w", raw_chunk_text, re.UNICODE)) >= 2:
+                searchable = build_searchable_augmented_text(
+                    raw_chunk_text,
+                    meta,
+                    section_context="Policy & General Prose"
                 )
-            )
-            chunk_id += 1
+                spoken = clean_for_speech(raw_chunk_text, meta)
+                chunks.append(
+                    ChunkResult(
+                        chunk_id=chunk_id,
+                        start_char=chunk_start_char,
+                        end_char=chunk_end_char,
+                        text=raw_chunk_text,
+                        raw_text=raw_chunk_text,
+                        searchable_augmented_text=raw_chunk_text,
+                        chunk_type="semantic",
+                        warnings=[],
+                        metadata={
+                            **meta,
+                            "unit": self.unit,
+                            "sentence_count": len(selected_sentences),
+                        }
+                    )
+                )
+                chunk_id += 1
 
             if curr_end_idx >= len(sentences):
                 break
