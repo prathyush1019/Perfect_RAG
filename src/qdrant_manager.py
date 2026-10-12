@@ -51,7 +51,22 @@ class LocalQdrantManager:
         """Ensure collection exists with correct vector size and Cosine metric."""
         col_name = model_cfg.collection_name
         try:
-            if not self.client.collection_exists(collection_name=col_name):
+            if self.client.collection_exists(collection_name=col_name):
+                info = self.client.get_collection(collection_name=col_name)
+                current_size = info.config.params.vectors.size
+                if current_size != model_cfg.dimensions:
+                    # Mismatched dimension from previous schema: recreate with correct dimensions
+                    self.client.delete_collection(collection_name=col_name)
+                    self.client.create_collection(
+                        collection_name=col_name,
+                        vectors_config=qmodels.VectorParams(
+                            size=model_cfg.dimensions,
+                            distance=qmodels.Distance.COSINE
+                        )
+                    )
+                    return True
+                return False
+            else:
                 self.client.create_collection(
                     collection_name=col_name,
                     vectors_config=qmodels.VectorParams(
@@ -60,7 +75,6 @@ class LocalQdrantManager:
                     )
                 )
                 return True
-            return False
         except Exception:
             return False
 

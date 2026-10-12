@@ -93,7 +93,7 @@ ALL_CLOUDFLARE_MODELS: Dict[str, EmbeddingModelConfig] = {
     "@cf/pfnet/plamo-embedding-1b": EmbeddingModelConfig(
         id="@cf/pfnet/plamo-embedding-1b",
         display_name="PLaMo-Embedding-1B (PFN Multilingual)",
-        dimensions=1024,
+        dimensions=2048,
         languages="Japanese, English & Multilingual",
         max_tokens=2048,
         collection_name="cf_pfnet_plamo_embedding_1b",
