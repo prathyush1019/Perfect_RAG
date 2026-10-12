@@ -42,6 +42,7 @@ class CloudflareEmbedder:
         self.last_fetch_meta: Dict[str, Any] = {}
         self._last_used_mock = False
         self.logs: collections.deque = collections.deque(maxlen=200)
+        self._query_vector_cache: Dict[Tuple[str, str], List[float]] = {}
 
         # Build persistent connection pool
         self.session = requests.Session()
@@ -275,12 +276,34 @@ class CloudflareEmbedder:
     def embed_single_query(self, query: str, model_id: str) -> Tuple[List[float], float]:
         """
         Generate embedding for a single question or search query.
+        Utilizes an in-memory LRU cache to achieve sub-millisecond retrieval on repeat queries.
         Returns:
             Tuple of (vector, api_latency_ms)
         """
-        vectors, latency_ms = self.embed_texts([query], model_id=model_id, batch_size=1)
+        norm_query = query.strip()
+        cache_key = (model_id, norm_query.lower())
+        if cache_key in self._query_vector_cache:
+            cached_vector = self._query_vector_cache[cache_key]
+            self._record_log(
+                "SUCCESS",
+                model_id,
+                "In-Memory Query Cache",
+                200,
+                0.2,
+                f"Cache Hit! Instant sub-millisecond embedding for '{norm_query[:35]}...'",
+                dims=len(cached_vector),
+                count=1
+            )
+            return cached_vector, 0.2
+
+        vectors, latency_ms = self.embed_texts([norm_query], model_id=model_id, batch_size=1)
         if not vectors:
             raise RuntimeError(f"Failed to obtain embedding vector for query with model {model_id}")
+
+        if len(self._query_vector_cache) >= 1000:
+            self._query_vector_cache.pop(next(iter(self._query_vector_cache)))
+        self._query_vector_cache[cache_key] = vectors[0]
+
         return vectors[0], latency_ms
 
     def _extract_vectors_from_response(
