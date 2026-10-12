@@ -114,7 +114,7 @@ Answer: [Complete, unshortened answer]
         prompt = f"Please normalize and structurally transcribe the following document into clean Markdown adhering to all rules:\n\n{raw_text}"
 
         candidate_models = [self.model_name]
-        for alt in ["gemini-3-flash-preview", "gemini-3.8-flash"]:
+        for alt in ["gemini-3-flash-preview", "gemini-flash-lite-latest", "gemini-flash-latest"]:
             if alt not in candidate_models:
                 candidate_models.append(alt)
 
