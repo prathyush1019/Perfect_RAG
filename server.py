@@ -1,5 +1,6 @@
 import os
 import sys
+import re
 import json
 import io
 import time
@@ -116,7 +117,13 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     "error": norm_meta.get("error"),
                     "message": norm_meta.get("message")
                 }
-                if norm_meta.get("status") == "success":
+                if norm_meta.get("status") == "server_busy":
+                    self._send_json({
+                        "error": norm_meta.get("error", "Server is busy. Please try again in a few moments."),
+                        "llm_info": llm_info
+                    }, 503)
+                    return
+                elif norm_meta.get("status") == "success":
                     active_text = norm_text
 
             strategy, _ = detect_document_strategy(active_text)

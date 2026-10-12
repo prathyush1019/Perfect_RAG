@@ -1,5 +1,6 @@
 import os
 import re
+import time
 from typing import Optional, Dict, Any, Tuple
 from dotenv import load_dotenv
 
@@ -84,9 +85,21 @@ Answer: [Complete, unshortened answer]
         """Returns True if Gemini API client is configured."""
         return self._client is not None or bool(self.api_key)
 
+    @staticmethod
+    def _is_busy_error(err_str: str) -> bool:
+        """Checks if the error indicates temporary server busy / rate limit / 503."""
+        indicators = [
+            "503", "unavailable", "high demand", "resource_exhausted",
+            "429", "rate limit", "overloaded", "server is busy",
+            "spikes in demand", "temporarily unavailable"
+        ]
+        low = err_str.lower()
+        return any(ind in low for ind in indicators)
+
     def normalize(self, raw_text: str) -> Tuple[str, Dict[str, Any]]:
         """
         Transcribes and restructures raw document text into clean Markdown.
+        Retries up to 5 times with 2-second delay if server busy errors (503/high demand) occur.
         Returns: (normalized_markdown, metadata_stats)
         """
         if not raw_text or not raw_text.strip():
@@ -106,55 +119,83 @@ Answer: [Complete, unshortened answer]
                 candidate_models.append(alt)
 
         last_error = None
-        for m in candidate_models:
-            try:
-                # 1. New google-genai SDK
-                if hasattr(self, "_sdk_type") and self._sdk_type == "google-genai":
-                    from google import genai
-                    from google.genai import types
+        was_server_busy = False
 
-                    client = self._client or genai.Client(api_key=self.api_key)
-                    response = client.models.generate_content(
-                        model=m,
-                        contents=prompt,
-                        config=types.GenerateContentConfig(
-                            system_instruction=self.SYSTEM_INSTRUCTION,
-                            temperature=0.1,  # Low temperature for strict adherence & zero hallucination
+        for m in candidate_models:
+            # Try up to 5 times with 2-second wait when server is busy
+            for attempt in range(1, 6):
+                try:
+                    # 1. New google-genai SDK
+                    if hasattr(self, "_sdk_type") and self._sdk_type == "google-genai":
+                        from google import genai
+                        from google.genai import types
+
+                        client = self._client or genai.Client(api_key=self.api_key)
+                        response = client.models.generate_content(
+                            model=m,
+                            contents=prompt,
+                            config=types.GenerateContentConfig(
+                                system_instruction=self.SYSTEM_INSTRUCTION,
+                                temperature=0.1,  # Low temperature for strict adherence & zero hallucination
+                            )
                         )
+                        output_text = response.text.strip()
+                        output_text = self._strip_outer_code_fence(output_text)
+                        return output_text, {
+                            "status": "success",
+                            "model": m,
+                            "sdk": "google-genai",
+                            "attempt": attempt,
+                            "input_len": len(raw_text),
+                            "output_len": len(output_text)
+                        }
+
+                    # 2. Legacy google-generativeai SDK fallback
+                    import google.generativeai as gai
+                    gai.configure(api_key=self.api_key)
+                    model = gai.GenerativeModel(
+                        model_name=m,
+                        system_instruction=self.SYSTEM_INSTRUCTION
+                    )
+                    response = model.generate_content(
+                        prompt,
+                        generation_config=gai.GenerationConfig(temperature=0.1)
                     )
                     output_text = response.text.strip()
                     output_text = self._strip_outer_code_fence(output_text)
                     return output_text, {
                         "status": "success",
                         "model": m,
-                        "sdk": "google-genai",
+                        "sdk": "google-generativeai",
+                        "attempt": attempt,
                         "input_len": len(raw_text),
                         "output_len": len(output_text)
                     }
 
-                # 2. Legacy google-generativeai SDK fallback
-                import google.generativeai as gai
-                gai.configure(api_key=self.api_key)
-                model = gai.GenerativeModel(
-                    model_name=m,
-                    system_instruction=self.SYSTEM_INSTRUCTION
-                )
-                response = model.generate_content(
-                    prompt,
-                    generation_config=gai.GenerationConfig(temperature=0.1)
-                )
-                output_text = response.text.strip()
-                output_text = self._strip_outer_code_fence(output_text)
-                return output_text, {
-                    "status": "success",
-                    "model": m,
-                    "sdk": "google-generativeai",
-                    "input_len": len(raw_text),
-                    "output_len": len(output_text)
-                }
-            except Exception as e:
-                last_error = str(e)
-                continue
+                except Exception as e:
+                    err_str = str(e)
+                    last_error = err_str
+
+                    if self._is_busy_error(err_str):
+                        was_server_busy = True
+                        if attempt < 5:
+                            print(f"[GeminiNormalizer] Model {m} server busy (Attempt {attempt}/5). Waiting 2s before retry...")
+                            time.sleep(2)
+                            continue
+                        else:
+                            print(f"[GeminiNormalizer] Model {m} still busy after 5 attempts.")
+                            break
+                    else:
+                        # Non-busy error (e.g. 404 model not found), switch to candidate model
+                        break
+
+        # If server was busy across all attempts
+        if was_server_busy:
+            return raw_text, {
+                "status": "server_busy",
+                "error": "Server is busy: LLM endpoint is experiencing high demand (503). Retried 5 times with 2-second intervals. Please try again in a few moments.",
+                "message": f"Server busy error after 5 attempts: {last_error}"
+            }
 
         return raw_text, {
             "status": "error",
