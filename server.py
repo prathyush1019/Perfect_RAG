@@ -333,7 +333,7 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 embedder._record_log(
                     level=level,
                     model_id=mid,
-                    endpoint=f"Qdrant HNSW ('{qdrant_manager.get_collection_name(mid)}')",
+                    endpoint=f"Qdrant HNSW ('{m_cfg.collection_name}')",
                     status_code=200 if hits else 404,
                     latency_ms=qdrant_lat,
                     message=qdrant_status_msg,
