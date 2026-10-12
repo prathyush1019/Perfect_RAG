@@ -103,11 +103,19 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 return
 
             active_text = text
+            llm_info = {"enabled": False, "status": "skipped", "model": model_name}
             # Gemini Stage 1
             if model_name and model_name.lower() != "none" and "gemini" in model_name.lower():
                 api_key = os.getenv("GEMINI_API_KEY", os.getenv("GOOGLE_API_KEY", ""))
                 normalizer = GeminiDocumentNormalizer(api_key=api_key, model_name=model_name)
                 norm_text, norm_meta = normalizer.normalize(active_text)
+                llm_info = {
+                    "enabled": True,
+                    "status": norm_meta.get("status"),
+                    "model": norm_meta.get("model", model_name),
+                    "error": norm_meta.get("error"),
+                    "message": norm_meta.get("message")
+                }
                 if norm_meta.get("status") == "success":
                     active_text = norm_text
 
@@ -175,7 +183,10 @@ class ChunkingHandler(BaseHTTPRequestHandler):
             chunks_data = [c.to_dict() for c in final_chunks]
             self._send_json({
                 "chunks": chunks_data,
-                "stats": audit_summary
+                "stats": audit_summary,
+                "strategy": strategy,
+                "llm_info": llm_info,
+                "normalized_text": active_text if llm_info.get("status") == "success" else None
             })
 
         elif parsed.path == "/api/embed_and_save":

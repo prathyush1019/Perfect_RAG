@@ -54,9 +54,9 @@ Answer: [Complete, unshortened answer]
 6. POLICIES & PROSE: Format general background, policies, or instructions as clean markdown paragraphs with headings.
 7. Return ONLY the clean, structured Markdown output. Do not wrap in markdown code blocks like ```markdown ... ``` and do not include commentary or chit-chat."""
 
-    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-3.8-flash"):
+    def __init__(self, api_key: Optional[str] = None, model_name: str = "gemini-3-flash-preview"):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-        self.model_name = model_name
+        self.model_name = model_name or "gemini-3-flash-preview"
         self._client = None
         self._init_client()
 
@@ -98,63 +98,69 @@ Answer: [Complete, unshortened answer]
                 "message": "Gemini API Key not configured; passed verbatim through Stage 1."
             }
 
-        # Try Google GenAI SDK first
         prompt = f"Please normalize and structurally transcribe the following document into clean Markdown adhering to all rules:\n\n{raw_text}"
 
-        try:
-            # 1. New google-genai SDK
-            if hasattr(self, "_sdk_type") and self._sdk_type == "google-genai":
-                from google import genai
-                from google.genai import types
+        candidate_models = [self.model_name]
+        for alt in ["gemini-3-flash-preview", "gemini-3.8-flash"]:
+            if alt not in candidate_models:
+                candidate_models.append(alt)
 
-                client = self._client or genai.Client(api_key=self.api_key)
-                response = client.models.generate_content(
-                    model=self.model_name,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        system_instruction=self.SYSTEM_INSTRUCTION,
-                        temperature=0.1,  # Low temperature for strict adherence & zero hallucination
+        last_error = None
+        for m in candidate_models:
+            try:
+                # 1. New google-genai SDK
+                if hasattr(self, "_sdk_type") and self._sdk_type == "google-genai":
+                    from google import genai
+                    from google.genai import types
+
+                    client = self._client or genai.Client(api_key=self.api_key)
+                    response = client.models.generate_content(
+                        model=m,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            system_instruction=self.SYSTEM_INSTRUCTION,
+                            temperature=0.1,  # Low temperature for strict adherence & zero hallucination
+                        )
                     )
+                    output_text = response.text.strip()
+                    output_text = self._strip_outer_code_fence(output_text)
+                    return output_text, {
+                        "status": "success",
+                        "model": m,
+                        "sdk": "google-genai",
+                        "input_len": len(raw_text),
+                        "output_len": len(output_text)
+                    }
+
+                # 2. Legacy google-generativeai SDK fallback
+                import google.generativeai as gai
+                gai.configure(api_key=self.api_key)
+                model = gai.GenerativeModel(
+                    model_name=m,
+                    system_instruction=self.SYSTEM_INSTRUCTION
+                )
+                response = model.generate_content(
+                    prompt,
+                    generation_config=gai.GenerationConfig(temperature=0.1)
                 )
                 output_text = response.text.strip()
-                # Strip markdown triple backtick wrapper if model included it
                 output_text = self._strip_outer_code_fence(output_text)
                 return output_text, {
                     "status": "success",
-                    "model": self.model_name,
-                    "sdk": "google-genai",
+                    "model": m,
+                    "sdk": "google-generativeai",
                     "input_len": len(raw_text),
                     "output_len": len(output_text)
                 }
+            except Exception as e:
+                last_error = str(e)
+                continue
 
-            # 2. Legacy google-generativeai SDK fallback
-            import google.generativeai as gai
-            gai.configure(api_key=self.api_key)
-            model = gai.GenerativeModel(
-                model_name=self.model_name,
-                system_instruction=self.SYSTEM_INSTRUCTION
-            )
-            response = model.generate_content(
-                prompt,
-                generation_config=gai.GenerationConfig(temperature=0.1)
-            )
-            output_text = response.text.strip()
-            output_text = self._strip_outer_code_fence(output_text)
-            return output_text, {
-                "status": "success",
-                "model": self.model_name,
-                "sdk": "google-generativeai",
-                "input_len": len(raw_text),
-                "output_len": len(output_text)
-            }
-
-        except Exception as e:
-            # Fallback with error message
-            return raw_text, {
-                "status": "error",
-                "error": str(e),
-                "message": f"Gemini API normalization failed: {str(e)}. Proceeding with deterministic stage."
-            }
+        return raw_text, {
+            "status": "error",
+            "error": str(last_error),
+            "message": f"Gemini API normalization failed across candidate models: {str(last_error)}. Proceeding with deterministic stage."
+        }
 
     @staticmethod
     def _strip_outer_code_fence(text: str) -> str:
