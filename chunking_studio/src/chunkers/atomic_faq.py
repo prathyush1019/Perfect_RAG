@@ -10,10 +10,13 @@ from .context_ag import (
 
 class AtomicFAQChunker(BaseChunker):
     """
-    Atomic FAQ Chunker.
-    Ensures that 1 Chunk = Exactly 1 Complete Q&A Pair.
-    Guarantees an answer is never severed from its question.
+    FAQ Chunker with configurable grouping:
+    - consolidate_all=True (Default): Groups ALL questions and answers in the section into 1 consolidated chunk.
+    - consolidate_all=False: Splits into atomic 1:1 Q&A pairs (1 chunk per question).
     """
+
+    def __init__(self, consolidate_all: bool = True):
+        self.consolidate_all = consolidate_all
 
     def chunk(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> List[ChunkResult]:
         if not text or not text.strip():
@@ -50,6 +53,42 @@ class AtomicFAQChunker(BaseChunker):
             header_matches = list(header_q_pattern.finditer(text))
             if len(header_matches) > 1:
                 matches = header_matches
+
+        # If consolidate_all is True: return all FAQs together in one single chunk
+        if self.consolidate_all:
+            raw_text = text.strip()
+            q_titles = []
+            for m in matches:
+                m_start = m.start() if m.start() == 0 else m.start() + 1
+                line = text[m_start:].splitlines()[0].strip()
+                clean_q = re.sub(r"^#{1,4}\s*", "", line)
+                if clean_q:
+                    q_titles.append(clean_q)
+
+            searchable = build_searchable_augmented_text(
+                raw_text,
+                meta,
+                section_context=f"Frequently Asked Questions ({len(q_titles)} Q&A pairs)" if q_titles else "Frequently Asked Questions"
+            )
+
+            return [
+                ChunkResult(
+                    chunk_id=1,
+                    start_char=0,
+                    end_char=len(text),
+                    text=raw_text,
+                    raw_text=raw_text,
+                    searchable_augmented_text=raw_text,
+                    chunk_type="faq",
+                    warnings=[],
+                    metadata={
+                        **meta,
+                        "faq_count": len(q_titles) if q_titles else 1,
+                        "faq_questions": q_titles,
+                        "is_consolidated_faq": True,
+                    }
+                )
+            ]
 
         # If still no matches or only 1, check paragraph blocks with Question / Answer
         if not matches:

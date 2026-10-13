@@ -26,7 +26,8 @@ class HybridCompositeChunker(BaseChunker):
         overlap: Optional[int] = None,
         target_words: int = 150,
         overlap_words: int = 25,
-        rows_per_chunk: int = 1
+        rows_per_chunk: int = 1,
+        consolidate_faq: bool = True
     ):
         self.unit = unit
         self.chunk_size = chunk_size
@@ -34,10 +35,11 @@ class HybridCompositeChunker(BaseChunker):
         self.target_words = target_words
         self.overlap_words = overlap_words
         self.rows_per_chunk = rows_per_chunk
+        self.consolidate_faq = consolidate_faq
 
         self.table_chunker = PricingTableChunker(rows_per_chunk=rows_per_chunk)
         self.location_chunker = LocationEntityChunker()
-        self.faq_chunker = AtomicFAQChunker()
+        self.faq_chunker = AtomicFAQChunker(consolidate_all=consolidate_faq)
         self.semantic_chunker = SemanticSentenceChunker(
             unit=unit,
             chunk_size=chunk_size,
@@ -132,6 +134,17 @@ class HybridCompositeChunker(BaseChunker):
                 "text": stext
             })
 
+        # If consolidate_faq is True, merge contiguous FAQ zones into one master FAQ zone
+        if self.consolidate_faq and classified_zones:
+            merged_zones = []
+            for z in classified_zones:
+                if merged_zones and merged_zones[-1]["type"] == "faq" and z["type"] == "faq":
+                    merged_zones[-1]["end"] = z["end"]
+                    merged_zones[-1]["text"] = merged_zones[-1]["text"].rstrip() + "\n\n" + z["text"].lstrip()
+                else:
+                    merged_zones.append(z)
+            classified_zones = merged_zones
+
         return classified_zones
 
     def _classify_section(self, text: str) -> str:
@@ -150,7 +163,7 @@ class HybridCompositeChunker(BaseChunker):
             text,
             re.IGNORECASE
         )
-        if len(faq_matches) >= 2 or ("faq" in lower and len(faq_matches) >= 1) or ("frequently asked" in lower):
+        if len(faq_matches) >= 1 and (len(faq_matches) >= 2 or "faq" in lower or "frequently asked" in lower or "answer:" in lower or "ans:" in lower or "?" in text):
             return "faq"
 
         # Check for Location / Branch / Property Directory

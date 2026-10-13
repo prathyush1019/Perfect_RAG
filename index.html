@@ -153,6 +153,22 @@
             gap: 16px;
             margin-top: 16px;
         }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 16px;
+            margin-top: 16px;
+        }
+        @media (max-width: 960px) {
+            .grid-4 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+        @media (max-width: 580px) {
+            .grid-4 {
+                grid-template-columns: 1fr;
+            }
+        }
         .grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -520,7 +536,7 @@
                 <label for="documentText">Document Content</label>
                 <textarea id="documentText" placeholder="Paste your raw document here..."></textarea>
 
-                <div class="grid-3">
+                <div class="grid-4">
                     <div>
                         <label for="unitSelect">Measurement Unit</label>
                         <select id="unitSelect" onchange="handleUnitChange()">
@@ -533,11 +549,18 @@
                         <input type="number" id="chunkSize" value="512" min="50" max="8192">
                     </div>
                     <div>
-                        <label for="modelSelect">Step 1: LLM Structural Normalizer</label>
+                        <label for="modelSelect">Step 1: LLM Normalizer</label>
                         <select id="modelSelect">
-                            <option value="gemini-3-flash-preview" selected>⚡ Gemini 3 Flash (Fastest • Never Busy)</option>
-                            <option value="gemini-flash-lite-latest">🍃 Gemini Flash Lite (High Availability)</option>
-                            <option value="none">None (Bypass LLM / Deterministic Regex Only)</option>
+                            <option value="gemini-3-flash-preview" selected>⚡ Gemini 3 Flash (Fastest)</option>
+                            <option value="gemini-flash-lite-latest">🍃 Gemini Flash Lite</option>
+                            <option value="none">None (Regex Only)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="faqChunkMode">FAQ Chunking Mode</label>
+                        <select id="faqChunkMode" style="border-color: #58a6ff66;">
+                            <option value="consolidated" selected>📦 All FAQs in One Chunk</option>
+                            <option value="atomic">✂️ Atomic (1 Chunk per Q&A)</option>
                         </select>
                     </div>
                 </div>
@@ -847,6 +870,8 @@ Main Content:
             status.style.display = 'block';
             status.innerText = 'Chunking document with Context-AG engine...';
 
+            const faqMode = document.getElementById('faqChunkMode') ? document.getElementById('faqChunkMode').value : 'consolidated';
+
             try {
                 const res = await fetch('/api/chunk', {
                     method: 'POST',
@@ -857,7 +882,8 @@ Main Content:
                         chunk_size: chunkSize,
                         overlap: 50,
                         model: model,
-                        doc_name: docName
+                        doc_name: docName,
+                        faq_mode: faqMode
                     })
                 });
                 const data = await res.json();

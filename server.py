@@ -143,6 +143,9 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 elif norm_meta.get("status") == "success":
                     active_text = norm_text
 
+            faq_mode = payload.get("faq_mode", "consolidated").lower()
+            consolidate_faq = (faq_mode != "atomic")
+
             strategy, _ = detect_document_strategy(active_text)
             chunker = get_chunker(
                 strategy,
@@ -150,7 +153,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 chunk_size=chunk_size,
                 overlap=overlap,
                 target_words=chunk_size,
-                overlap_words=overlap
+                overlap_words=overlap,
+                consolidate_faq=consolidate_faq
             )
             metadata = {"doc_title": payload.get("doc_name", "Document"), "currency": "INR"}
             raw_chunks = chunker.chunk(active_text, metadata=metadata)

@@ -79,13 +79,14 @@ def get_chunker(strategy: str, **kwargs) -> BaseChunker:
     unit = kwargs.get("unit", "characters")
     chunk_size = kwargs.get("chunk_size")
     overlap = kwargs.get("overlap")
+    consolidate_faq = kwargs.get("consolidate_faq", True)
 
     if "price" in s or "table" in s:
         return PricingTableChunker(rows_per_chunk=kwargs.get("rows_per_chunk", 1))
     elif "loc" in s or "branch" in s:
         return LocationEntityChunker()
     elif "faq" in s or "atomic" in s:
-        return AtomicFAQChunker()
+        return AtomicFAQChunker(consolidate_all=consolidate_faq)
     elif "hybrid" in s or "composite" in s:
         return HybridCompositeChunker(
             unit=unit,
@@ -93,7 +94,8 @@ def get_chunker(strategy: str, **kwargs) -> BaseChunker:
             overlap=overlap,
             target_words=kwargs.get("target_words", 150),
             overlap_words=kwargs.get("overlap_words", 25),
-            rows_per_chunk=kwargs.get("rows_per_chunk", 1)
+            rows_per_chunk=kwargs.get("rows_per_chunk", 1),
+            consolidate_faq=consolidate_faq
         )
     else:
         return SemanticSentenceChunker(

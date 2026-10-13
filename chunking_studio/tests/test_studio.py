@@ -59,20 +59,29 @@ def run_tests():
         assert "Hours" in c.raw_text or "Timing" in c.raw_text
     print(f"  ✅ Passed: Exactly 4 discrete location card chunks created.")
 
-    # 3. Test FAQ Integrity
-    print("\n[Test 3] Testing Atomic FAQ 1:1 Q&A Pair Rule...")
+    # 3. Test FAQ Integrity (Consolidated & Atomic Modes)
+    print("\n[Test 3] Testing FAQ Chunking (Consolidated & Atomic)...")
     faq_file = os.path.join(sample_dir, "sample_faq.txt")
     with open(faq_file, "r", encoding="utf-8") as f:
         faq_text = f.read()
 
-    faq_chunker = AtomicFAQChunker()
-    faq_chunks = faq_chunker.chunk(faq_text, meta)
-    assert len(faq_chunks) == 10, f"Expected exactly 10 FAQ chunks, got {len(faq_chunks)}"
-    for c in faq_chunks:
+    # Default: Consolidated into 1 chunk
+    faq_chunker_consolidated = AtomicFAQChunker(consolidate_all=True)
+    faq_chunks_consolidated = faq_chunker_consolidated.chunk(faq_text, meta)
+    assert len(faq_chunks_consolidated) == 1, f"Expected 1 consolidated FAQ chunk, got {len(faq_chunks_consolidated)}"
+    assert faq_chunks_consolidated[0].chunk_type == "faq"
+    assert faq_chunks_consolidated[0].metadata.get("faq_count") == 10
+    print(f"  ✅ Passed: Exactly 1 consolidated chunk created containing all 10 FAQs.")
+
+    # Atomic Mode: 1:1 Q&A pair chunks
+    faq_chunker_atomic = AtomicFAQChunker(consolidate_all=False)
+    faq_chunks_atomic = faq_chunker_atomic.chunk(faq_text, meta)
+    assert len(faq_chunks_atomic) == 10, f"Expected exactly 10 FAQ chunks, got {len(faq_chunks_atomic)}"
+    for c in faq_chunks_atomic:
         assert c.chunk_type == "faq"
         assert "Question" in c.raw_text
         assert "Answer" in c.raw_text
-    print(f"  ✅ Passed: Exactly 10 discrete Q&A chunks created.")
+    print(f"  ✅ Passed: Exactly 10 discrete Q&A chunks created when atomic mode is requested.")
 
     # 4. Test Hybrid Detection & Multi-Zone Chunking
     print("\n[Test 4] Testing Hybrid Composite Detection & Multi-Zone Dispatch...")
