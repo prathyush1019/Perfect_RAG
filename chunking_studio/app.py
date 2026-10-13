@@ -178,8 +178,8 @@ Main Content:
         chunks = st.session_state["active_chunks"]
         st.success(f"Generated {len(chunks)} Chunks!")
 
-        if st.button("💾 Embed & Save All to Qdrant (All 7 Cloudflare Models)", type="secondary"):
-            with st.spinner("Generating embeddings across all Cloudflare models & upserting into Qdrant..."):
+        if st.button("💾 Embed & Save All to Qdrant (All 4 BGE Models)", type="secondary"):
+            with st.spinner("Generating embeddings across all BGE models & upserting into Qdrant..."):
                 chunk_texts = [c["text"] for c in chunks]
                 doc_id = f"doc_{int(time.time())}_{uuid.uuid4().hex[:6]}"
                 embeddings_by_model = {}
@@ -188,7 +188,7 @@ Main Content:
                     vecs, _ = embedder.embed_texts(chunk_texts, model_id=mid)
                     return mid, vecs
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=7) as ex:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
                     results = list(ex.map(_embed, AVAILABLE_MODEL_IDS))
 
                 for mid, vecs in results:
@@ -200,7 +200,7 @@ Main Content:
                     chunks=chunks,
                     embeddings_by_model=embeddings_by_model
                 )
-                st.success(f"✅ Successfully indexed into Qdrant across all 7 models! Document ID: `{doc_id}`")
+                st.success(f"✅ Successfully indexed into Qdrant across all 4 BGE models! Document ID: `{doc_id}`")
 
         for c in chunks:
             with st.expander(f"Chunk #{c['chunk_id']} [{c.get('chunk_type', 'text').upper()}] ({c.get('char_count', len(c['text']))} chars • ~{c.get('token_count', len(c['text'])//4)} tokens)"):
@@ -226,13 +226,13 @@ with tab2:
         query = st.text_input("Question / Search Query", value="What are the facilities and BHK construction prices in Sriram Garden?")
         top_k = st.slider("Top Chunks per Model", min_value=1, max_value=10, value=3)
 
-        if st.button("🔎 Search Across All Cloudflare Models", type="primary"):
+        if st.button("🔎 Search Across All BGE Models", type="primary"):
             if not selected_ids:
                 st.warning("Please select at least one document to search from.")
             elif not query.strip():
                 st.warning("Please enter a question.")
             else:
-                with st.spinner("Querying all Cloudflare models in parallel..."):
+                with st.spinner("Querying all BGE models in parallel..."):
                     def _search(mid):
                         m_cfg = ALL_CLOUDFLARE_MODELS[mid]
                         q_vec, api_lat = embedder.embed_single_query(query, model_id=mid)
@@ -253,7 +253,7 @@ with tab2:
                             "hits": hits
                         }
 
-                    with concurrent.futures.ThreadPoolExecutor(max_workers=7) as ex:
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as ex:
                         search_results = list(ex.map(_search, AVAILABLE_MODEL_IDS))
 
                     st.write("### Comparative Multi-Model Results")

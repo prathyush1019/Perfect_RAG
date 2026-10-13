@@ -43,20 +43,8 @@ class EmbeddingModelConfig:
     provider: str = "Cloudflare Workers AI"
 
 
-# Full catalog of embedding models (Google Gemini & Cloudflare Workers AI)
+# Catalog of BAAI BGE embedding models on Cloudflare Workers AI
 ALL_CLOUDFLARE_MODELS: Dict[str, EmbeddingModelConfig] = {
-    "gemini-embedding-001": EmbeddingModelConfig(
-        id="gemini-embedding-001",
-        display_name="Google Gemini Embedding (Live Active)",
-        dimensions=3072,
-        languages="100+ Languages (High Precision Multilingual)",
-        max_tokens=2048,
-        collection_name="gemini_embedding_001",
-        description="Google's flagship 3072-dimensional multilingual embedding model. Authenticated directly via your active GEMINI_API_KEY.",
-        badge_color="#34A853",
-        is_multilingual=True,
-        provider="Google Gemini API"
-    ),
     "@cf/baai/bge-m3": EmbeddingModelConfig(
         id="@cf/baai/bge-m3",
         display_name="BGE-M3 (Flagship Multilingual)",
@@ -66,39 +54,6 @@ ALL_CLOUDFLARE_MODELS: Dict[str, EmbeddingModelConfig] = {
         collection_name="cf_baai_bge_m3",
         description="Multi-functional, multi-lingual, and multi-granularity flagship model from BAAI. Premier dense multilingual retrieval.",
         badge_color="#F38020",
-        is_multilingual=True
-    ),
-    "@cf/google/embeddinggemma-300m": EmbeddingModelConfig(
-        id="@cf/google/embeddinggemma-300m",
-        display_name="EmbeddingGemma-300M (Google)",
-        dimensions=768,
-        languages="100+ Languages (Google Gemma 3)",
-        max_tokens=2048,
-        collection_name="cf_google_embeddinggemma_300m",
-        description="High-efficiency 300M parameter model built from Google's Gemma 3 architecture, fine-tuned for multilingual search.",
-        badge_color="#4285F4",
-        is_multilingual=True
-    ),
-    "@cf/qwen/qwen3-embedding-0.6b": EmbeddingModelConfig(
-        id="@cf/qwen/qwen3-embedding-0.6b",
-        display_name="Qwen3-Embedding-0.6B (Alibaba)",
-        dimensions=1024,
-        languages="100+ Languages (Cross-Lingual)",
-        max_tokens=8192,
-        collection_name="cf_qwen_qwen3_embedding_0_6b",
-        description="Lightweight 0.6B model from Alibaba Qwen series optimized for high-throughput multilingual ranking and semantic similarity.",
-        badge_color="#7B1FA2",
-        is_multilingual=True
-    ),
-    "@cf/pfnet/plamo-embedding-1b": EmbeddingModelConfig(
-        id="@cf/pfnet/plamo-embedding-1b",
-        display_name="PLaMo-Embedding-1B (PFN Multilingual)",
-        dimensions=2048,
-        languages="Japanese, English & Multilingual",
-        max_tokens=2048,
-        collection_name="cf_pfnet_plamo_embedding_1b",
-        description="Preferred Networks 1B parameter embedding model specializing in Japanese & multilingual nuance and cross-lingual retrieval.",
-        badge_color="#00897B",
         is_multilingual=True
     ),
     "@cf/baai/bge-large-en-v1.5": EmbeddingModelConfig(
@@ -138,3 +93,4 @@ ALL_CLOUDFLARE_MODELS: Dict[str, EmbeddingModelConfig] = {
 
 AVAILABLE_MODEL_IDS: List[str] = list(ALL_CLOUDFLARE_MODELS.keys())
 MULTILINGUAL_MODEL_IDS: List[str] = [m for m, cfg in ALL_CLOUDFLARE_MODELS.items() if cfg.is_multilingual]
+

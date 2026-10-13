@@ -577,7 +577,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                         <div>
                             <h2 style="font-size: 17px; font-weight: 700;" id="chunksCountTitle">Generated Chunks</h2>
-                            <p style="font-size: 13px; color: #8b949e;">Review chunks below, then embed into Qdrant vector space across all 7 Cloudflare models.</p>
+                            <p style="font-size: 13px; color: #8b949e;">Review chunks below, then embed into Qdrant vector space across all 4 BGE models.</p>
                         </div>
                         <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
                             <label style="font-size: 12px; color: #58a6ff; display: flex; align-items: center; gap: 6px; cursor: pointer; user-select: none;">
@@ -585,7 +585,7 @@
                                 <span><strong>Wipe previous documents</strong> (Only keep this document in Qdrant)</span>
                             </label>
                             <button class="btn-embed-qdrant" id="btnEmbedQdrant" onclick="handleEmbedAndSave()">
-                                💾 Embed & Save All to Qdrant Vector Space (All Models)
+                                💾 Embed & Save All to Qdrant Vector Space (All 4 BGE Models)
                             </button>
                         </div>
                     </div>
@@ -639,13 +639,10 @@
                         <label for="searchModelSelect">Target Embedding Model</label>
                         <select id="searchModelSelect" onchange="handleModelSelectChange()" style="width: 100%; background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 10px 12px; border-radius: 6px; font-size: 13.5px; font-family: inherit;">
                             <option value="@cf/baai/bge-m3" selected>🟠 BGE-M3 (Flagship Multilingual, 1024d) — Recommended</option>
-                            <option value="@cf/google/embeddinggemma-300m">🔵 EmbeddingGemma-300M (Google Gemma, 768d)</option>
-                            <option value="@cf/qwen/qwen3-embedding-0.6b">🟣 Qwen3-Embedding-0.6B (Alibaba Qwen, 1024d)</option>
-                            <option value="@cf/pfnet/plamo-embedding-1b">🟢 PLaMo-Embedding-1B (PFN Multilingual, 1024d)</option>
                             <option value="@cf/baai/bge-large-en-v1.5">🟡 BGE-Large-EN-v1.5 (BAAI High-Capacity, 1024d)</option>
                             <option value="@cf/baai/bge-base-en-v1.5">⚪ BGE-Base-EN-v1.5 (BAAI Balanced, 768d)</option>
                             <option value="@cf/baai/bge-small-en-v1.5">🟤 BGE-Small-EN-v1.5 (BAAI Ultra-Fast, 384d)</option>
-                            <option value="all">⚡ All 7 Models (Benchmark & Compare Everything)</option>
+                            <option value="all">⚡ All 4 BGE Models (Benchmark & Compare Everything)</option>
                         </select>
                     </div>
                     <div>
@@ -659,15 +656,13 @@
                     <div style="font-size: 11.5px; color: #8b949e; margin-bottom: 6px; text-transform: uppercase; font-weight: 600;">Quick Model Selection:</div>
                     <div class="model-quick-pills" id="modelQuickPills">
                         <button type="button" class="quick-pill active" onclick="selectSearchModel('@cf/baai/bge-m3')">🟠 BGE-M3</button>
-                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/google/embeddinggemma-300m')">🔵 Gemma-300M</button>
-                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/qwen/qwen3-embedding-0.6b')">🟣 Qwen3</button>
-                        <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/pfnet/plamo-embedding-1b')">🟢 PLaMo</button>
                         <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-large-en-v1.5')">🟡 BGE-Large</button>
                         <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-base-en-v1.5')">⚪ BGE-Base</button>
                         <button type="button" class="quick-pill" onclick="selectSearchModel('@cf/baai/bge-small-en-v1.5')">🟤 BGE-Small</button>
-                        <button type="button" class="quick-pill" onclick="selectSearchModel('all')">⚡ All 7 Models</button>
+                        <button type="button" class="quick-pill" onclick="selectSearchModel('all')">⚡ All 4 BGE Models</button>
                     </div>
                 </div>
+
 
                 <button class="btn-search" id="btnSearch" onclick="handleSearch()" style="margin-top: 16px;">
                     🔍 Embed Question & Fetch Chunks using BGE-M3 (Single Model)
@@ -1092,7 +1087,7 @@ Main Content:
             });
 
             if (val === 'all') {
-                btn.innerText = '⚡ Embed Question & Fetch Chunks Across All 7 Models (Benchmark)';
+                btn.innerText = '⚡ Embed Question & Fetch Chunks Across All 4 BGE Models (Benchmark)';
             } else {
                 const optText = sel.options[sel.selectedIndex].text.split('(')[0].trim();
                 btn.innerText = `🔍 Embed Question & Fetch Chunks using ${optText} Only`;
@@ -1125,7 +1120,7 @@ Main Content:
             status.style.display = 'block';
 
             if (isAll) {
-                status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all 7 Cloudflare models in parallel...`;
+                status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all 4 BGE models in parallel...`;
             } else {
                 const sel = document.getElementById('searchModelSelect');
                 const modelName = sel.options[sel.selectedIndex].text.split('(')[0].trim();
