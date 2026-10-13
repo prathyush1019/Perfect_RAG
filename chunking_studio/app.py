@@ -240,7 +240,8 @@ with tab2:
                             query_vector=q_vec,
                             model_id=mid,
                             doc_ids=selected_ids,
-                            top_k=top_k
+                            top_k=top_k,
+                            raw_query=query
                         )
                         return {
                             "mid": mid,

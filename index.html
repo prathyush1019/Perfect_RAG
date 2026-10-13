@@ -1268,7 +1268,7 @@ Main Content:
                                         • <strong style="color:#58a6ff;">${escapeHtml(h.doc_name)}</strong>
                                         <span style="color:#8b949e;">(Chunk #${h.chunk_id})</span>
                                     </span>
-                                    <span class="hit-score">Cosine: ${scorePct}% <span style="font-size:11px; color:#8b949e;">(${h.score})</span></span>
+                                    <span class="hit-score">Score: ${scorePct}% <span style="font-size:11px; color:#8b949e;">(${h.score})</span></span>
                                 </div>
                                 <div class="match-bar-bg">
                                     <div class="match-bar-fill" style="width: ${scorePct}%;"></div>
@@ -1295,10 +1295,11 @@ Main Content:
                 const logDetails = `
                     <details style="margin: 8px 0 12px; font-size: 11px; background: #0d1117; border: 1px solid #21262d; border-radius: 6px; padding: 6px 10px;">
                         <summary style="cursor: pointer; color: #58a6ff; font-weight: 600; display: flex; align-items: center; justify-content: space-between;">
-                            <span>🌐 Cloudflare API & Retrieval Log Details</span>
+                            <span>🌐 Qdrant Native RRF Hybrid & Cloudflare API Details</span>
                             <span style="font-size: 10px; color: ${mData.api_status_code === 200 ? '#3fb950' : '#f85149'};">HTTP ${mData.api_status_code} • ${mData.api_latency_ms}ms</span>
                         </summary>
                         <div style="margin-top: 8px; font-family: 'JetBrains Mono', monospace; font-size: 11px; line-height: 1.6; color: #c9d1d9; border-top: 1px solid #21262d; padding-top: 8px; word-break: break-all;">
+                            <div><span style="color:#8b949e;">Qdrant Engine:</span> <span style="color:#7ee787;">⚡ Exact Flat Scan (exact: true) + Native RRF Hybrid (Dense + BM25 Lexical)</span></div>
                             <div><span style="color:#8b949e;">Cloudflare Endpoint:</span> <code style="color:#79c0ff;">${escapeHtml(mData.log_entry?.endpoint || '')}</code></div>
                             <div><span style="color:#8b949e;">Status:</span> <strong style="color:${mData.api_status_code === 200 ? '#3fb950' : '#f85149'};">HTTP ${mData.api_status_code}</strong> | <span style="color:#8b949e;">API Latency:</span> <span style="color:#e3b341;">${mData.api_latency_ms} ms</span> | <span style="color:#8b949e;">Dimensions:</span> <strong>${mData.dimensions}d</strong></div>
                             <div><span style="color:#8b949e;">Qdrant Filter:</span> <code style="color:#a5d6ff;">${JSON.stringify(data.selected_doc_ids || [])}</code> | <span style="color:#8b949e;">Qdrant Latency:</span> <span style="color:#e3b341;">${mData.qdrant_latency_ms} ms</span></div>
@@ -1307,6 +1308,7 @@ Main Content:
                         </div>
                     </details>
                 `;
+
 
                 card.innerHTML = `
                     <div class="model-card-header">

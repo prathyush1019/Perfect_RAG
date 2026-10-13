@@ -297,6 +297,9 @@ class CloudflareEmbedder:
             Tuple of (vector, api_latency_ms)
         """
         norm_query = query.strip()
+        from src.sparse_encoder import format_asymmetric_query
+        formatted_query, was_prefixed = format_asymmetric_query(norm_query, model_id)
+
         clean_key = norm_query.lower().strip("?!.,;:\"' \t\n\r")
         cache_key = (model_id, clean_key)
         if cache_key in self._query_vector_cache:
@@ -313,7 +316,13 @@ class CloudflareEmbedder:
             )
             return cached_vector, 0.2
 
-        vectors, latency_ms = self.embed_texts([norm_query], model_id=model_id, batch_size=1)
+        if was_prefixed:
+            try:
+                print(f"[Asymmetric Query Prefix] Applied to {model_id}: '{formatted_query[:75]}...'")
+            except Exception:
+                pass
+
+        vectors, latency_ms = self.embed_texts([formatted_query], model_id=model_id, batch_size=1)
         if not vectors:
             raise RuntimeError(f"Failed to obtain embedding vector for query with model {model_id}")
 
@@ -322,6 +331,7 @@ class CloudflareEmbedder:
         self._query_vector_cache[cache_key] = vectors[0]
 
         return vectors[0], latency_ms
+
 
     def _extract_vectors_from_response(
         self,

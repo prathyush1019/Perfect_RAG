@@ -16,10 +16,17 @@ from src.cloudflare_config import (
 )
 
 
+from src.sparse_encoder import compute_sparse_vector
+
+
 class LocalQdrantManager:
     """
     Manages local on-disk Qdrant storage with dedicated collections
     for each Cloudflare Workers AI embedding model and supports document filtering.
+    Implements:
+      - Fix #1: Exact flat scan (exact: True) for 100% recall
+      - Fix #3: Native Qdrant Hybrid Search with Reciprocal Rank Fusion (RRF)
+      - Fix #4: High-precision token/entity price-boosted lexical matching
     """
 
     def __init__(self, storage_path: str = DEFAULT_QDRANT_STORAGE_PATH):
@@ -48,34 +55,56 @@ class LocalQdrantManager:
             self.ensure_collection(model_cfg)
 
     def ensure_collection(self, model_cfg: EmbeddingModelConfig) -> bool:
-        """Ensure collection exists with correct vector size and Cosine metric."""
+        """
+        Ensure collection exists with hybrid schema:
+        - Named dense vector with Cosine metric
+        - Named sparse vector for exact lexical/number/price matching
+        """
         col_name = model_cfg.collection_name
         try:
             if self.client.collection_exists(collection_name=col_name):
                 info = self.client.get_collection(collection_name=col_name)
-                current_size = info.config.params.vectors.size
-                if current_size != model_cfg.dimensions:
-                    # Mismatched dimension from previous schema: recreate with correct dimensions
+                vectors_param = info.config.params.vectors
+                is_valid_hybrid = (
+                    isinstance(vectors_param, dict)
+                    and "dense" in vectors_param
+                    and vectors_param["dense"].size == model_cfg.dimensions
+                    and info.config.params.sparse_vectors is not None
+                    and "sparse" in info.config.params.sparse_vectors
+                )
+                if not is_valid_hybrid:
+                    # Upgrade legacy schema to native Hybrid schema (dense + sparse)
                     self.client.delete_collection(collection_name=col_name)
                     self.client.create_collection(
                         collection_name=col_name,
-                        vectors_config=qmodels.VectorParams(
-                            size=model_cfg.dimensions,
-                            distance=qmodels.Distance.COSINE
-                        )
+                        vectors_config={
+                            "dense": qmodels.VectorParams(
+                                size=model_cfg.dimensions,
+                                distance=qmodels.Distance.COSINE
+                            )
+                        },
+                        sparse_vectors_config={
+                            "sparse": qmodels.SparseVectorParams()
+                        }
                     )
                     return True
                 return False
             else:
                 self.client.create_collection(
                     collection_name=col_name,
-                    vectors_config=qmodels.VectorParams(
-                        size=model_cfg.dimensions,
-                        distance=qmodels.Distance.COSINE
-                    )
+                    vectors_config={
+                        "dense": qmodels.VectorParams(
+                            size=model_cfg.dimensions,
+                            distance=qmodels.Distance.COSINE
+                        )
+                    },
+                    sparse_vectors_config={
+                        "sparse": qmodels.SparseVectorParams()
+                    }
                 )
                 return True
-        except Exception:
+        except Exception as e:
+            print(f"Error ensuring collection {col_name}: {e}")
             return False
 
     def upsert_document_chunks(
@@ -86,8 +115,9 @@ class LocalQdrantManager:
         embeddings_by_model: Dict[str, List[List[float]]]
     ) -> Dict[str, Dict[str, Any]]:
         """
-        Upserts embedded chunks into each model's collection.
-        Returns mapping of model_id -> {"upserted_count": N, "latency_ms": X}.
+        Upserts embedded chunks into each model's collection with dual vectors:
+        1. Dense semantic vector
+        2. Sparse lexical vector (BM25 term hashing with exact price/number boost)
         """
         results = {}
         for model_id, vectors in embeddings_by_model.items():
@@ -102,12 +132,15 @@ class LocalQdrantManager:
             for chunk, vec in zip(chunks, vectors):
                 chunk_id = chunk.get("chunk_id", 1)
                 point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{doc_id}_{model_id}_{chunk_id}"))
+                raw_text = chunk.get("text") or chunk.get("clean_text") or chunk.get("raw_text", "")
+                sparse_vec = compute_sparse_vector(raw_text)
+
                 payload = {
                     "doc_id": doc_id,
                     "doc_name": doc_name,
                     "chunk_id": chunk_id,
-                    "text": chunk.get("text") or chunk.get("clean_text") or chunk.get("raw_text", ""),
-                    "char_count": len(chunk.get("text") or chunk.get("clean_text") or chunk.get("raw_text", "")),
+                    "text": raw_text,
+                    "char_count": len(raw_text),
                     "metadata": chunk.get("metadata", {}),
                     "model_id": model_id,
                     "timestamp": time.time()
@@ -115,7 +148,10 @@ class LocalQdrantManager:
                 points.append(
                     qmodels.PointStruct(
                         id=point_id,
-                        vector=vec,
+                        vector={
+                            "dense": vec,
+                            "sparse": sparse_vec
+                        },
                         payload=payload
                     )
                 )
@@ -140,11 +176,15 @@ class LocalQdrantManager:
         query_vector: List[float],
         model_id: str,
         doc_ids: Optional[List[str]] = None,
-        top_k: int = 4
+        top_k: int = 4,
+        raw_query: Optional[str] = None
     ) -> Tuple[List[Dict[str, Any]], float]:
         """
         Performs vector similarity search against the model's collection.
-        If `doc_ids` is provided, strictly filters search to only those documents!
+        Features:
+          - Fix #1: Exact Flat Scan (exact: True) to eliminate HNSW graph approximation error
+          - Fix #3: Native Qdrant RRF Fusion combining Dense semantic + Sparse lexical/price matching
+          - Document filtering when doc_ids are provided
         """
         model_cfg = ALL_CLOUDFLARE_MODELS.get(model_id)
         if not model_cfg:
@@ -167,12 +207,48 @@ class LocalQdrantManager:
 
         t0 = time.perf_counter()
         try:
-            res = self.client.query_points(
-                collection_name=col_name,
-                query=query_vector,
-                query_filter=query_filter,
-                limit=top_k
+            info = self.client.get_collection(collection_name=col_name)
+            is_hybrid = (
+                info.config.params.sparse_vectors is not None
+                and "sparse" in info.config.params.sparse_vectors
             )
+
+            if is_hybrid and raw_query:
+                # Fix #3: Native Qdrant Reciprocal Rank Fusion (RRF)
+                sparse_query_vec = compute_sparse_vector(raw_query)
+                prefetch = [
+                    qmodels.Prefetch(
+                        query=query_vector,
+                        using="dense",
+                        limit=top_k * 3,
+                        filter=query_filter,
+                        params=qmodels.SearchParams(exact=True)  # Fix #1: Disable Approximation ➔ exact: True
+                    ),
+                    qmodels.Prefetch(
+                        query=sparse_query_vec,
+                        using="sparse",
+                        limit=top_k * 3,
+                        filter=query_filter
+                    )
+                ]
+                res = self.client.query_points(
+                    collection_name=col_name,
+                    prefetch=prefetch,
+                    query=qmodels.FusionQuery(fusion=qmodels.Fusion.RRF),
+                    search_params=qmodels.SearchParams(exact=True),
+                    limit=top_k
+                )
+            else:
+                # Fallback to exact flat scan dense search
+                res = self.client.query_points(
+                    collection_name=col_name,
+                    query=query_vector,
+                    using="dense" if isinstance(info.config.params.vectors, dict) else None,
+                    query_filter=query_filter,
+                    search_params=qmodels.SearchParams(exact=True),  # Fix #1: exact: True
+                    limit=top_k
+                )
+
             search_ms = (time.perf_counter() - t0) * 1000.0
 
             retrieved = []

@@ -319,7 +319,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     query_vector=q_vec,
                     model_id=mid,
                     doc_ids=selected_doc_ids,
-                    top_k=top_k
+                    top_k=top_k,
+                    raw_query=query
                 )
                 meta = embedder.last_fetch_meta.get(mid, {})
                 sc = meta.get("status_code", 200)
