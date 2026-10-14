@@ -132,6 +132,31 @@ def run_tests():
     assert audit_summary["quality_score"] == 100.0, f"Expected 100% quality score, got {audit_summary['quality_score']}%"
     print(f"  ✅ Passed: Auditor quality score is {audit_summary['quality_score']}% for properly structured table chunks.")
 
+    # 8. Test Contextual Chunk Grounding (Anthropic Retrieval)
+    print("\n[Test 8] Testing Contextual Chunk Grounding (Anthropic Retrieval)...")
+    from src.chunkers.contextual_grounder import apply_contextual_chunk_grounding, extract_document_title
+
+    sample_doc = """# Apollo Dental Care Guide 2026
+
+## Dental Implant Pricing & Warranties
+Zirconia full arch replacements start at ₹35,000.
+Includes lifetime warranty coverage.
+
+## Clinic Locations
+### Whitefield Branch
+Address: Inner Circle, Whitefield.
+Phone: +91 9876543210.
+"""
+    raw_hybrid = hybrid_chunker.chunk(sample_doc, {"doc_title": "Apollo Dental Care"})
+    grounded_chunks = apply_contextual_chunk_grounding(raw_hybrid, sample_doc, "Apollo Dental Care", enabled=True)
+
+    assert len(grounded_chunks) > 0, "Expected grounded chunks"
+    for gc in grounded_chunks:
+        assert "[Context:" in gc.text, f"Chunk missing context anchor: {gc.text}"
+        assert gc.context_grounding != "", "ChunkResult context_grounding must be set"
+        assert "Apollo Dental" in gc.text
+    print(f"  ✅ Passed: All {len(grounded_chunks)} chunks successfully anchored with contextual breadcrumbs.")
+
     print("\n" + "=" * 60)
     print("🏆 ALL ACCEPTANCE TESTS PASSED WITH 100% COMPLIANCE!")
     print("=" * 60)
@@ -139,3 +164,4 @@ def run_tests():
 
 if __name__ == "__main__":
     run_tests()
+

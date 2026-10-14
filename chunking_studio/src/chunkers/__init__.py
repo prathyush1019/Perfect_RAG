@@ -107,6 +107,9 @@ def get_chunker(strategy: str, **kwargs) -> BaseChunker:
         )
 
 
+from .contextual_grounder import apply_contextual_chunk_grounding
+
+
 __all__ = [
     "BaseChunker",
     "ChunkResult",
@@ -120,5 +123,7 @@ __all__ = [
     "build_searchable_augmented_text",
     "clean_for_speech",
     "calculate_speech_seconds",
-    "format_context_header"
+    "format_context_header",
+    "apply_contextual_chunk_grounding"
 ]
+

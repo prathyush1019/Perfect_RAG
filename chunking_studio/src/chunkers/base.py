@@ -70,9 +70,10 @@ class ChunkResult:
     end_char: int                           # End character offset
     text: str = ""                          # EXACT clean text payload for embedding model
     chunk_type: str = "semantic"            # "pricing_table" | "location" | "faq" | "semantic"
-    raw_text: str = ""                      # Verbatim slice
+    raw_text: str = ""                      # Verbatim slice (ungrounded)
     searchable_augmented_text: str = ""     # Searchable representation
     spoken_clean_text: str = ""             # (Legacy compatibility)
+    context_grounding: str = ""             # Anthropic-style Contextual Retrieval Anchor [Context: ...]
     word_count: int = 0
     speech_seconds: float = 0.0
     warnings: List[Dict[str, str]] = field(default_factory=list)
@@ -85,6 +86,8 @@ class ChunkResult:
             self.raw_text = self.text
         if not self.searchable_augmented_text:
             self.searchable_augmented_text = self.text
+        if not self.context_grounding and self.metadata.get("context_grounding"):
+            self.context_grounding = self.metadata["context_grounding"]
         if not self.word_count and self.text:
             self.word_count = len(self.text.split())
 
@@ -99,12 +102,16 @@ class ChunkResult:
     def to_dict(self) -> Dict[str, Any]:
         """
         Export schema for Cloudflare Embeddings & Vector DBs:
-        - 'text': Pure text to embed.
-        - 'metadata': Context tags stored in vector payload (NOT sent to embedding).
+        - 'text': Pure grounded text to embed.
+        - 'raw_text': Verbatim ungrounded slice.
+        - 'context_grounding': The contextual anchor breadcrumb.
+        - 'metadata': Context tags stored in vector payload.
         """
+        grounding = self.context_grounding or self.metadata.get("context_grounding", "")
         combined_metadata = {
             "chunk_id": self.chunk_id,
             "chunk_type": self.chunk_type,
+            "context_grounding": grounding,
             "char_count": self.char_count,
             "token_count": self.token_count,
             "start_char": self.start_char,
@@ -115,12 +122,15 @@ class ChunkResult:
             "chunk_id": self.chunk_id,
             "chunk_type": self.chunk_type,
             "text": self.text,
+            "raw_text": self.raw_text,
+            "context_grounding": grounding,
             "char_count": self.char_count,
             "token_count": self.token_count,
             "start_char": self.start_char,
             "end_char": self.end_char,
             "metadata": combined_metadata,
         }
+
 
 
 class BaseChunker(ABC):

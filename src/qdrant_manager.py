@@ -130,9 +130,18 @@ class LocalQdrantManager:
 
             points = []
             for chunk, vec in zip(chunks, vectors):
-                chunk_id = chunk.get("chunk_id", 1)
+                if isinstance(chunk, dict):
+                    chunk_id = chunk.get("chunk_id", 1)
+                    raw_text = chunk.get("text") or chunk.get("clean_text") or chunk.get("raw_text", "")
+                    meta_dict = chunk.get("metadata", {})
+                    context_grounding = chunk.get("context_grounding") or meta_dict.get("context_grounding", "")
+                else:
+                    chunk_id = getattr(chunk, "chunk_id", 1)
+                    raw_text = getattr(chunk, "text", "") or getattr(chunk, "raw_text", "")
+                    meta_dict = getattr(chunk, "metadata", {})
+                    context_grounding = getattr(chunk, "context_grounding", "") or meta_dict.get("context_grounding", "")
+
                 point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{doc_id}_{model_id}_{chunk_id}"))
-                raw_text = chunk.get("text") or chunk.get("clean_text") or chunk.get("raw_text", "")
                 sparse_vec = compute_sparse_vector(raw_text)
 
                 payload = {
@@ -140,11 +149,13 @@ class LocalQdrantManager:
                     "doc_name": doc_name,
                     "chunk_id": chunk_id,
                     "text": raw_text,
+                    "context_grounding": context_grounding,
                     "char_count": len(raw_text),
-                    "metadata": chunk.get("metadata", {}),
+                    "metadata": meta_dict,
                     "model_id": model_id,
                     "timestamp": time.time()
                 }
+
                 points.append(
                     qmodels.PointStruct(
                         id=point_id,

@@ -19,7 +19,11 @@ if BASE_DIR not in sys.path:
 from dotenv import load_dotenv
 load_dotenv()
 
-from chunking_studio.src.chunkers import detect_document_strategy, get_chunker
+from chunking_studio.src.chunkers import (
+    detect_document_strategy,
+    get_chunker,
+    apply_contextual_chunk_grounding
+)
 from chunking_studio.src.chunkers.base import count_units, split_text_to_ceiling, ChunkResult
 from chunking_studio.src.auditor import VoiceChunkAuditor
 from chunking_studio.src.normalizer import GeminiDocumentNormalizer
@@ -204,6 +208,20 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     c.metadata["hard_ceiling"] = chunk_size
                     final_chunks.append(c)
                     curr_id += 1
+
+            doc_name = payload.get("doc_name", "Document").strip() or "Document"
+            enable_grounding = payload.get("context_grounding", True)
+            if isinstance(enable_grounding, str):
+                enable_grounding = enable_grounding.lower() in ["true", "1", "yes", "on"]
+
+            if enable_grounding:
+                final_chunks = apply_contextual_chunk_grounding(
+                    final_chunks,
+                    full_text=active_text,
+                    doc_name=doc_name,
+                    enabled=True
+                )
+
 
             auditor = VoiceChunkAuditor()
             audit_summary = auditor.audit_chunks(final_chunks)
