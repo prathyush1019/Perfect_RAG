@@ -33,9 +33,11 @@ from chunking_studio.src.document_parsers import parse_uploaded_file
 from src.cloudflare_config import ALL_CLOUDFLARE_MODELS, AVAILABLE_MODEL_IDS
 from src.cloudflare_embedder import CloudflareEmbedder
 from src.qdrant_manager import LocalQdrantManager
+from src.rag_answerer import RAGAnswerEngine, LLM_MODELS
 
 embedder = CloudflareEmbedder()
 qdrant_manager = LocalQdrantManager()
+rag_answerer = RAGAnswerEngine()
 
 
 class ChunkingHandler(BaseHTTPRequestHandler):
@@ -69,6 +71,7 @@ class ChunkingHandler(BaseHTTPRequestHandler):
             ]
             self._send_json({
                 "models": models_list,
+                "llm_models": LLM_MODELS,
                 "is_configured": embedder.is_configured(),
                 "account_id": embedder.account_id
             })
@@ -410,6 +413,29 @@ class ChunkingHandler(BaseHTTPRequestHandler):
 
             results_dict = {r["model_id"]: r for r in model_results if r is not None}
 
+            # Optional Grounded AI Answer Synthesis
+            generate_answer = payload.get("generate_answer", True)
+            if isinstance(generate_answer, str):
+                generate_answer = generate_answer.lower() in ["true", "1", "yes", "on"]
+            llm_model = payload.get("llm_model", "@cf/meta/llama-3.1-8b-instruct")
+
+            ai_answer = None
+            if generate_answer:
+                # Prioritize BGE-M3 hits or first model with retrieved hits
+                primary_mid = "@cf/baai/bge-m3" if "@cf/baai/bge-m3" in results_dict else (valid_model_ids[0] if valid_model_ids else None)
+                primary_hits = results_dict.get(primary_mid, {}).get("hits", [])
+                if not primary_hits:
+                    for mid_candidate, r in results_dict.items():
+                        if r.get("hits"):
+                            primary_hits = r["hits"]
+                            break
+
+                ai_answer = rag_answerer.answer_question(
+                    query=query,
+                    chunks=primary_hits,
+                    model_id=llm_model
+                )
+
             self._send_json({
                 "query": query,
                 "selected_doc_ids": selected_doc_ids,
@@ -417,8 +443,29 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                 "is_single_model": len(valid_model_ids) == 1,
                 "results_by_model": results_dict,
                 "results": results_dict,
+                "ai_answer": ai_answer,
                 "recent_logs": embedder.get_recent_logs(limit=40)
             })
+
+        elif parsed.path == "/api/answer":
+            content_len = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(content_len)
+            try:
+                payload = json.loads(body.decode("utf-8"))
+            except Exception as e:
+                self._send_json({"error": "Invalid JSON: " + str(e)}, 400)
+                return
+
+            query = payload.get("query", "").strip()
+            chunks = payload.get("chunks", [])
+            llm_model = payload.get("llm_model", "@cf/meta/llama-3.1-8b-instruct")
+
+            ai_answer = rag_answerer.answer_question(
+                query=query,
+                chunks=chunks,
+                model_id=llm_model
+            )
+            self._send_json(ai_answer)
 
         elif parsed.path == "/api/delete_document":
             content_len = int(self.headers.get("Content-Length", 0))
@@ -456,6 +503,8 @@ class ChunkingHandler(BaseHTTPRequestHandler):
             if account_id and api_token:
                 embedder.account_id = account_id
                 embedder.api_token = api_token
+                rag_answerer.account_id = account_id
+                rag_answerer.api_token = api_token
                 # Write to .env
                 env_path = os.path.join(BASE_DIR, ".env")
                 env_lines = []

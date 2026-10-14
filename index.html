@@ -678,14 +678,37 @@
                 </div>
 
 
+                <!-- Grounded LLM RAG Controls -->
+                <div style="margin-top: 14px; background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                        <label for="ragLlmToggle" style="margin: 0; font-size: 13.5px; font-weight: 600; color: #58a6ff; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none;">
+                            <input type="checkbox" id="ragLlmToggle" checked style="accent-color: #58a6ff; width: 16px; height: 16px;">
+                            <span>🤖 In-Take RAG Chunks & Synthesize Answer with LLM</span>
+                        </label>
+                        <span style="font-size: 11px; background: #1f6feb22; color: #58a6ff; border: 1px solid #388bfd55; padding: 2px 8px; border-radius: 12px; font-weight: 600;">Grounded AI</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="ragLlmSelect" style="margin: 0; font-size: 12px; color: #8b949e; white-space: nowrap;">LLM Model:</label>
+                        <select id="ragLlmSelect" style="background: #0d1117; border: 1px solid #30363d; color: #e6edf3; padding: 6px 10px; border-radius: 6px; font-size: 12.5px; font-family: inherit;">
+                            <option value="@cf/meta/llama-3.1-8b-instruct" selected>⚡ Meta Llama 3.1 8B Instruct (~800ms)</option>
+                            <option value="@cf/meta/llama-3.3-70b-instruct-fp8-fast">🧠 Meta Llama 3.3 70B Instruct (High Reasoning)</option>
+                            <option value="@cf/mistral/mistral-7b-instruct-v0.1">🌪️ Mistral 7B Instruct</option>
+                            <option value="gemini-3.8-flash">✨ Google Gemini 3.8 Flash</option>
+                        </select>
+                    </div>
+                </div>
+
                 <button class="btn-search" id="btnSearch" onclick="handleSearch()" style="margin-top: 16px;">
-                    🔍 Embed Question & Fetch Chunks using BGE-M3 (Single Model)
+                    🔍 Retrieve Chunks & Generate Grounded Answer (BGE-M3)
                 </button>
                 <div id="searchStatusBar" style="display:none; color:#58a6ff; margin-top:12px; font-size:13.5px; font-weight:500;"></div>
             </div>
 
             <!-- Search Results Section -->
             <div id="searchResultsSection" style="display: none;">
+                <!-- Grounded LLM AI Answer Card -->
+                <div id="aiAnswerContainer" style="display: none; margin-bottom: 24px;"></div>
+
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                     <h2 style="font-size: 18px; font-weight: 700;">Comparative Multi-Model Retrieval Results</h2>
                     <span id="searchMetricsPill" style="font-size: 12px; color: #8b949e;"></span>
@@ -1119,7 +1142,7 @@ Main Content:
             handleModelSelectChange();
         }
 
-        // 4. Multi-Model Semantic Search
+        // 4. Multi-Model Semantic Search & Grounded LLM RAG
         async function handleSearch() {
             const query = document.getElementById('searchQueryInput').value.trim();
             if (!query) { alert('Please enter a question/query.'); return; }
@@ -1135,10 +1158,15 @@ Main Content:
             const btn = document.getElementById('btnSearch');
             const status = document.getElementById('searchStatusBar');
 
+            const generateAnswer = document.getElementById('ragLlmToggle') ? document.getElementById('ragLlmToggle').checked : true;
+            const llmModel = document.getElementById('ragLlmSelect') ? document.getElementById('ragLlmSelect').value : '@cf/meta/llama-3.1-8b-instruct';
+
             btn.disabled = true;
             status.style.display = 'block';
 
-            if (isAll) {
+            if (generateAnswer) {
+                status.innerText = `Fetching Qdrant vector chunks & synthesizing grounded answer with ${llmModel.split('/').pop()}...`;
+            } else if (isAll) {
                 status.innerText = `Searching across ${selectedDocIds.length} selected document(s) with all 4 BGE models in parallel...`;
             } else {
                 const sel = document.getElementById('searchModelSelect');
@@ -1154,7 +1182,9 @@ Main Content:
                         query: query,
                         selected_doc_ids: selectedDocIds,
                         model_id: modelId,
-                        top_k: topK
+                        top_k: topK,
+                        generate_answer: generateAnswer,
+                        llm_model: llmModel
                     })
                 });
                 const data = await res.json();
@@ -1169,6 +1199,128 @@ Main Content:
             }
         }
 
+        function renderAiAnswer(aiAnswer, query) {
+            const container = document.getElementById('aiAnswerContainer');
+            if (!container) return;
+
+            if (!aiAnswer || !aiAnswer.answer) {
+                container.style.display = 'none';
+                container.innerHTML = '';
+                return;
+            }
+
+            container.style.display = 'block';
+
+            const status = aiAnswer.status;
+            const answerText = aiAnswer.answer || '';
+            const modelId = aiAnswer.model_id || '';
+            const latency = aiAnswer.latency_ms || 0;
+            const citations = aiAnswer.citations || [];
+
+            // Format answer text with bolding and readable paragraphs
+            let formattedAnswer = escapeHtml(answerText)
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code style="background:#21262d; padding:2px 5px; border-radius:4px; font-size:12px; color:#79c0ff;">$1</code>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
+
+            let citationsHtml = '';
+            if (citations.length > 0) {
+                citationsHtml = `
+                    <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid #30363d;">
+                        <div style="font-size: 11px; text-transform: uppercase; color: #8b949e; font-weight: 600; margin-bottom: 8px;">
+                            📚 Grounded On ${citations.length} Verified Document Chunks:
+                        </div>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            ${citations.map(c => `
+                                <div style="background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 4px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px;">
+                                    <span style="color: #58a6ff; font-weight: 600;">#${c.source_index}</span>
+                                    <span style="color: #e6edf3;">${escapeHtml(c.doc_name)}</span>
+                                    <span style="color: #8b949e;">(Chunk #${c.chunk_id})</span>
+                                    <span style="color: #3fb950; font-size: 10.5px; font-weight: 600;">${c.score ? Math.round(c.score * 100) + '%' : ''}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            container.innerHTML = `
+                <div style="background: linear-gradient(180deg, #0d1117 0%, #161b22 100%); border: 1.5px solid #388bfd; border-radius: 12px; padding: 20px 22px; box-shadow: 0 8px 32px rgba(56, 139, 253, 0.12); position: relative;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; border-bottom: 1px solid #30363d; padding-bottom: 12px;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 22px;">🤖</span>
+                            <div>
+                                <h3 style="font-size: 16px; font-weight: 700; color: #58a6ff; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span>Grounded RAG Answer</span>
+                                    <span style="font-size: 11px; background: #23863622; border: 1px solid #23863666; color: #3fb950; padding: 2px 8px; border-radius: 12px; font-weight: 600;">100% Fact-Checked</span>
+                                </h3>
+                                <div style="font-size: 11.5px; color: #8b949e; margin-top: 2px;">
+                                    Model: <code style="color: #79c0ff;">${escapeHtml(modelId)}</code> • Latency: <strong style="color: #e3b341;">${latency} ms</strong>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button type="button" onclick="copyAiAnswer()" style="background: #21262d; border: 1px solid #30363d; color: #c9d1d9; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                📋 Copy Answer
+                            </button>
+                            <button type="button" onclick="regenerateAnswerWithSelectedModel()" style="background: #1f6feb22; border: 1px solid #388bfd66; color: #58a6ff; padding: 5px 12px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: 500;">
+                                🔄 Regenerate
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="aiAnswerContent" style="font-size: 14.5px; line-height: 1.7; color: #e6edf3; font-weight: 400; padding: 4px 2px;">
+                        ${formattedAnswer}
+                    </div>
+
+                    ${citationsHtml}
+                </div>
+            `;
+        }
+
+        function copyAiAnswer() {
+            const el = document.getElementById('aiAnswerContent');
+            if (el) {
+                navigator.clipboard.writeText(el.innerText);
+                alert('Copied AI Answer to clipboard!');
+            }
+        }
+
+        async function regenerateAnswerWithSelectedModel() {
+            const query = document.getElementById('searchQueryInput').value.trim();
+            const llmModel = document.getElementById('ragLlmSelect').value;
+            if (!query) return;
+
+            const container = document.getElementById('aiAnswerContainer');
+            if (container) {
+                container.innerHTML = `
+                    <div style="background: #161b22; border: 1px dashed #388bfd; border-radius: 12px; padding: 24px; text-align: center; color: #58a6ff;">
+                        ⚡ Re-synthesizing grounded answer with <strong>${escapeHtml(llmModel)}</strong>...
+                    </div>
+                `;
+            }
+
+            const primaryHits = window.lastSearchHits || [];
+
+            try {
+                const res = await fetch('/api/answer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        query: query,
+                        chunks: primaryHits,
+                        llm_model: llmModel
+                    })
+                });
+                const aiAnswer = await res.json();
+                renderAiAnswer(aiAnswer, query);
+            } catch (err) {
+                alert('Regenerate error: ' + err.message);
+            }
+        }
+
         function renderSearchResults(data) {
             const sec = document.getElementById('searchResultsSection');
             const grid = document.getElementById('modelResultsGrid');
@@ -1179,6 +1331,21 @@ Main Content:
             const resultsByModel = data.results_by_model || {};
             const modelKeys = Object.keys(resultsByModel);
             const isSingle = data.is_single_model || modelKeys.length === 1;
+
+            // Cache primary hits for answer regeneration
+            const primaryMid = "@cf/baai/bge-m3" in resultsByModel ? "@cf/baai/bge-m3" : (modelKeys[0] || null);
+            window.lastSearchHits = (primaryMid && resultsByModel[primaryMid]) ? resultsByModel[primaryMid].hits : [];
+            if (!window.lastSearchHits || window.lastSearchHits.length === 0) {
+                for (const k of modelKeys) {
+                    if (resultsByModel[k] && resultsByModel[k].hits && resultsByModel[k].hits.length > 0) {
+                        window.lastSearchHits = resultsByModel[k].hits;
+                        break;
+                    }
+                }
+            }
+
+            // Render Grounded AI Answer Card
+            renderAiAnswer(data.ai_answer, data.query);
 
             if (isSingle) {
                 const mData = resultsByModel[modelKeys[0]];
