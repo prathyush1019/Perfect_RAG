@@ -149,21 +149,39 @@ class ChunkingHandler(BaseHTTPRequestHandler):
 
             faq_mode = payload.get("faq_mode", "consolidated").lower()
             consolidate_faq = (faq_mode != "atomic")
+            doc_name = payload.get("doc_name", "Document").strip() or "Document"
+            enable_grounding = payload.get("context_grounding", True)
+            if isinstance(enable_grounding, str):
+                enable_grounding = enable_grounding.lower() in ["true", "1", "yes", "on"]
+
+            # If Contextual Grounding is enabled, reserve budget for the breadcrumb anchor
+            # (avg 40 tokens / 160 chars) so raw chunking leaves room without awkward splits
+            grounding_reserve = (40 if unit in ["tokens", "token"] else 160) if enable_grounding else 0
+            effective_chunk_size = max(50, chunk_size - grounding_reserve)
 
             strategy, _ = detect_document_strategy(active_text)
             chunker = get_chunker(
                 strategy,
                 unit=unit,
-                chunk_size=chunk_size,
+                chunk_size=effective_chunk_size,
                 overlap=overlap,
-                target_words=chunk_size,
+                target_words=effective_chunk_size,
                 overlap_words=overlap,
                 consolidate_faq=consolidate_faq
             )
-            metadata = {"doc_title": payload.get("doc_name", "Document"), "currency": "INR"}
+            metadata = {"doc_title": doc_name, "currency": "INR"}
             raw_chunks = chunker.chunk(active_text, metadata=metadata)
 
-            # Enforce hard ceiling across all chunks
+            # Apply Contextual Chunk Grounding (if enabled)
+            if enable_grounding:
+                raw_chunks = apply_contextual_chunk_grounding(
+                    raw_chunks,
+                    full_text=active_text,
+                    doc_name=doc_name,
+                    enabled=True
+                )
+
+            # Enforce strict hard ceiling across all chunks on the FINAL text (including anchor)
             final_chunks = []
             curr_id = 1
             for c in raw_chunks:
@@ -173,28 +191,33 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     continue
 
                 if count_units(c_text, unit) > chunk_size:
-                    entity_title = c.metadata.get("branch_name") or (c_text.splitlines()[0].strip() if c_text.splitlines() else "Entity")
-                    sub_pieces = split_text_to_ceiling(c_text, chunk_size, unit)
+                    anchor = c.context_grounding or ""
+                    anchor_units = count_units(anchor + "\n", unit) if anchor else 0
+                    body_budget = max(20, chunk_size - anchor_units)
+
+                    # Extract raw body by stripping anchor prefix if present
+                    raw_body = c.raw_text or c_text
+                    if anchor and raw_body.startswith(anchor):
+                        raw_body = raw_body[len(anchor):].lstrip("\n")
+
+                    sub_pieces = split_text_to_ceiling(raw_body, body_budget, unit)
                     total_sub = len(sub_pieces)
                     for sub_idx, sub in enumerate(sub_pieces, 1):
                         if len(re.findall(r"\w", sub.strip(), re.UNICODE)) < 2:
                             continue
-                        anchored_sub = sub
-                        if sub_idx > 1 and entity_title and entity_title not in sub[:120]:
-                            anchored_sub = f"[{entity_title} (Part {sub_idx}/{total_sub})]\n" + sub
-
+                        grounded_sub = f"{anchor}\n{sub}" if anchor else sub
                         final_chunks.append(
                             ChunkResult(
                                 chunk_id=curr_id,
                                 start_char=c.start_char,
                                 end_char=c.end_char,
-                                text=anchored_sub,
-                                raw_text=anchored_sub,
-                                searchable_augmented_text=anchored_sub,
+                                text=grounded_sub,
+                                raw_text=sub,
+                                searchable_augmented_text=grounded_sub,
                                 chunk_type=c.chunk_type,
+                                context_grounding=anchor,
                                 metadata={
                                     **c.metadata,
-                                    "parent_entity": entity_title,
                                     "sub_chunk": True,
                                     "part": sub_idx,
                                     "total_parts": total_sub,
@@ -208,19 +231,6 @@ class ChunkingHandler(BaseHTTPRequestHandler):
                     c.metadata["hard_ceiling"] = chunk_size
                     final_chunks.append(c)
                     curr_id += 1
-
-            doc_name = payload.get("doc_name", "Document").strip() or "Document"
-            enable_grounding = payload.get("context_grounding", True)
-            if isinstance(enable_grounding, str):
-                enable_grounding = enable_grounding.lower() in ["true", "1", "yes", "on"]
-
-            if enable_grounding:
-                final_chunks = apply_contextual_chunk_grounding(
-                    final_chunks,
-                    full_text=active_text,
-                    doc_name=doc_name,
-                    enabled=True
-                )
 
 
             auditor = VoiceChunkAuditor()
